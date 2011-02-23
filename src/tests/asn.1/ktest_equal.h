@@ -140,4 +140,6 @@ int ktest_equal_iakerb_finished
 
 int ktest_equal_ldap_sequence_of_keys(ldap_seqof_key_data *ref,
 				      ldap_seqof_key_data *var);
+
+int ktest_equal_pa_otp_req(krb5_pa_otp_req *req, krb5_pa_otp_req *var);
 #endif

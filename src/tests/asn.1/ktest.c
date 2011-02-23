@@ -973,6 +973,17 @@ krb5_error_code ktest_make_sample_ldap_seqof_key_data(p)
 }
 #endif
 
+krb5_error_code ktest_make_sample_pa_otp_req(p)
+    krb5_pa_otp_req*p;
+{
+    krb5_error_code retval;
+    memset(p, 0, sizeof(*p));
+    p->flags = 0;
+    retval = ktest_make_sample_data(&p->otp_value);
+    if (retval) return retval;
+    return retval;
+}
+
 krb5_error_code ktest_make_sample_predicted_sam_response(p)
     krb5_predicted_sam_response *p;
 {
@@ -1605,3 +1616,18 @@ void ktest_empty_ldap_seqof_key_data(ctx, p)
     free(p->key_data);
 }
 #endif
+
+void ktest_empty_pa_otp_req(p)
+    krb5_pa_otp_req *p;
+{
+    if (p == NULL) return;
+    free(p->otp_value.data);
+}
+
+void ktest_empty_pa_otp_req_with_ctx(ctx, p)
+    krb5_context ctx;
+    krb5_pa_otp_req *p;
+{
+    if (p == NULL) return;
+    free(p->otp_value.data);
+}

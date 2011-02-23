@@ -968,6 +968,14 @@ int main(argc, argv)
 
 #endif
 
+    /****************************************************************/
+    /* decode_pa_otp_req */
+    {
+        setup(krb5_pa_otp_req,"krb5_pa_otp_req",ktest_make_sample_pa_otp_req);
+        decode_run("pa_otp_req","","30 15 A0 07 03 05 00 00 00 00 00 A5 0A 04 08 6B 72 62 35 64 61 74 61",decode_krb5_pa_otp_req,ktest_equal_pa_otp_req,ktest_empty_pa_otp_req_with_ctx);
+        ktest_empty_pa_otp_req(&ref);
+    }
+
     krb5_free_context(test_context);
     exit(error_count);
     return(error_count);

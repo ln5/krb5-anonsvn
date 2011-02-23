@@ -1085,3 +1085,27 @@ decode_krb5_typed_data(const krb5_data *code, krb5_typed_data ***repptr)
 
     cleanup(free);
 }
+
+krb5_error_code
+decode_krb5_pa_otp_challenge(const krb5_data *code, krb5_pa_otp_challenge **repptr)
+{
+    setup_buf_only(krb5_pa_otp_challenge *);
+    alloc_field(rep);
+
+    retval = asn1_decode_pa_otp_challenge(&buf, rep);
+    if (retval) clean_return(retval);
+
+    cleanup(free);
+}
+
+krb5_error_code
+decode_krb5_pa_otp_req(const krb5_data *code, krb5_pa_otp_req **repptr)
+{
+    setup_buf_only(krb5_pa_otp_req *);
+    alloc_field(rep);
+
+    retval = asn1_decode_pa_otp_req(&buf, rep);
+    if (retval) clean_return(retval);
+
+    cleanup(free);
+}

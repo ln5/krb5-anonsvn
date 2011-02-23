@@ -1717,3 +1717,92 @@ asn1_decode_typed_data_ptr(asn1buf *buf, krb5_typed_data **valptr)
 {
     decode_ptr(krb5_typed_data *, asn1_decode_typed_data);
 }
+
+/* Definitions for http://tools.ietf.org/html/draft-ietf-krb-wg-otp-preauth-14 */
+
+asn1_error_code
+asn1_decode_pa_otp_challenge(asn1buf *buf, krb5_pa_otp_challenge *val)
+{
+    setup();
+    val->nonce.data = NULL;
+    val->otp_service.data = NULL;
+    val->otp_keyinfo.flags = -1;
+    val->salt.data = NULL;
+    val->s2kparams.data = NULL;
+    { begin_structure();
+        get_lenfield(val->nonce.length,val->nonce.data,0,asn1_decode_charstring);
+        opt_lenfield(val->otp_service.length,val->otp_service.data,1,asn1_decode_octetstring);
+        /* TODO: otp_keyinfo */
+        opt_lenfield(val->salt.length,val->salt.data,3,asn1_decode_generalstring);
+        opt_lenfield(val->s2kparams.length,val->s2kparams.data,4,asn1_decode_octetstring);
+
+        end_structure();
+    }
+    return 0;
+error_out:
+    krb5_free_data_contents(NULL, &val->nonce);
+    val->nonce.data = NULL;
+    krb5_free_data_contents(NULL, &val->otp_service);
+    val->otp_service.data = NULL;
+    val->otp_keyinfo.flags = -1;
+    krb5_free_data_contents(NULL, &val->salt);
+    val->salt.data = NULL;
+    krb5_free_data_contents(NULL, &val->s2kparams);
+    val->s2kparams.data = NULL;
+    return retval;
+}
+
+/* TODO: also used in asn1_k_decode_sam.c, maybe put it in a header file */
+#define opt_encfield(fld,tag,fn)                \
+    if (tagnum == tag) {                        \
+        get_field(fld,tag,fn); }                \
+    else {                                      \
+        fld.magic = 0;                          \
+        fld.enctype = 0;                        \
+        fld.kvno = 0;                           \
+        fld.ciphertext.data = NULL;             \
+        fld.ciphertext.length = 0;              \
+    }
+
+asn1_error_code
+asn1_decode_pa_otp_req(asn1buf *buf, krb5_pa_otp_req *val)
+{
+    setup();
+    val->flags = 0;
+    val->nonce.data = NULL;
+    val->enc_data.ciphertext.data = NULL;
+    val->hash_alg.algorithm.data = NULL;
+    val->hash_alg.parameters.data = NULL;
+    val->iteration_count = 0;
+    val->otp_value.data = NULL;
+    val->otp_challenge.data = NULL;
+    val->otp_counter.data = NULL;
+    val->otp_format = 0;
+    val->otp_time = 0;
+    val->otp_keyid.data = NULL;
+    val->otp_algid.data = NULL;
+    val->otp_vendor.data = NULL;
+    { begin_structure();
+        get_field(val->flags,0,asn1_decode_krb5_flags);
+        opt_lenfield(val->nonce.length,val->nonce.data,1,asn1_decode_charstring);
+        opt_encfield(val->enc_data,2,asn1_decode_encrypted_data);
+        /* TODO: hash algorithms */
+        opt_field(val->iteration_count,4,asn1_decode_int32,0);
+        opt_lenfield(val->otp_value.length,val->otp_value.data,5,asn1_decode_charstring);
+        opt_lenfield(val->otp_challenge.length,val->otp_challenge.data,6,asn1_decode_charstring);
+        opt_lenfield(val->otp_counter.length,val->otp_counter.data,7,asn1_decode_charstring);
+        opt_field(val->otp_format,8,asn1_decode_int32,0);
+
+        opt_lenfield(val->otp_keyid.length,val->otp_keyid.data,10,asn1_decode_charstring);
+        opt_lenfield(val->otp_algid.length,val->otp_algid.data,11,asn1_decode_charstring);
+        opt_lenfield(val->otp_vendor.length,val->otp_vendor.data,12,asn1_decode_charstring);
+
+        end_structure();
+    }
+    return 0;
+error_out:
+    krb5_free_data_contents(NULL, &val->nonce);
+    val->nonce.data = NULL;
+    /* FIXME: add more frees */
+    return retval;
+}

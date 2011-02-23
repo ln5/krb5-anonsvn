@@ -1345,3 +1345,9 @@ encode_krb5_iakerb_finished:
 .  .  [0] [Integer] 1
 .  .  [1] [Octet String] "1234"
 
+encode_krb5_pa_otp_req:
+
+[Sequence/Sequence Of] 
+.  [0] [Bit String] 0x0
+.  [5] [Octet String] "krb5data"
+
