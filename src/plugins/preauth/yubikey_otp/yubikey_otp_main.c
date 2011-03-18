@@ -279,7 +279,6 @@ process_preauth(krb5_context context, void *plugin_context,
 /* Server.  */
 static krb5_error_code
 check_token_id(krb5_context kcontext, const char *token,
-               const krb5_principal principal,
                struct _krb5_db_entry_new *client)
 {
     krb5_tl_data *tl_data;
@@ -529,7 +528,7 @@ server_verify_preauth(krb5_context context, struct _krb5_db_entry_new *client,
         return ENOMEM;
     }
 
-    ret = check_token_id(context, otp, request->client, client);
+    ret = check_token_id(context, otp, client);
     if (ret != 0) {
         SERVER_DEBUG("check_token_id failed");
         free(otp);
