@@ -327,18 +327,20 @@ server_init(krb5_context context,
 {
     int ret;
     struct yubikey_server_ctx *ctx = NULL;
-    krb5_error_code retval;
+    krb5_error_code retval = 0;
     int client_id = 0;
 
     ctx = calloc(1, sizeof(*ctx));
     if (ctx == NULL) {
-        return ENOMEM;
+        retval = ENOMEM;
+        goto errout;
     }
 
     ret = ykclient_init(&ctx->yk_ctx);
     if (ret != YKCLIENT_OK) {
         SERVER_DEBUG("ykclient_init failed\n");
-        return EFAULT;
+        retval = EFAULT;
+        goto errout;
     }
 
 /* set URL template from krb5.conf */
@@ -347,7 +349,7 @@ server_init(krb5_context context,
                                 NULL, &ctx->url_template);
     if (retval != 0) {
         SERVER_DEBUG("Failed to retrive URL template");
-        return retval;
+        goto errout;
     }
 
     if (ctx->url_template != NULL) {
@@ -359,19 +361,24 @@ server_init(krb5_context context,
                                 0, &client_id);
     if (retval != 0) {
         SERVER_DEBUG("Failed to retrive client id");
-        return retval;
+        goto errout;
     }
 
     if (client_id > 0) {
         ykclient_set_client(ctx->yk_ctx, client_id, 0, NULL);
     } else {
         SERVER_DEBUG("Missing Yubico client ID");
-        return EINVAL;
+        goto errout;
     }
 
     *plugin_context = ctx;
 
     return 0;
+
+ errout:
+    if (ctx != NULL)
+        free (ctx);
+    return retval;
 }
 
 static void
