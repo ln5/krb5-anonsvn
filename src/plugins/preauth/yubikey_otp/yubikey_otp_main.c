@@ -167,9 +167,9 @@ process_preauth(krb5_context context, void *plugin_context,
     krb5_data encoded_otp_challenge;
 
     retval = fast_get_armor_key(context, get_data_proc, rock, &armor_key);
-    if (retval || armor_key == NULL) {
+    if (retval != 0 || armor_key == NULL) {
         CLIENT_DEBUG("Missing armor key\n");
-        return EINVAL;
+        goto errout;
     }
 
     krb5_free_keyblock_contents(context, as_key);
@@ -177,7 +177,7 @@ process_preauth(krb5_context context, void *plugin_context,
     krb5_free_keyblock(context, armor_key);
     if (retval != 0) {
         CLIENT_DEBUG("krb5_copy_keyblock_contents failed\n");
-        return retval;
+        goto errout;
     }
 
     CLIENT_DEBUG("Got [%d] bytes padata type [%d]\n", padata->length,
@@ -191,13 +191,14 @@ process_preauth(krb5_context context, void *plugin_context,
             retval = decode_krb5_pa_otp_challenge(&encoded_otp_challenge,
                                                   &otp_challenge);
             if (retval != 0) {
-                return retval;
+                goto errout;
             }
         }
 
         if (otp_challenge->nonce.data == NULL) {
             CLIENT_DEBUG("Missing nonce in OTP challenge.\n");
-            return EINVAL;
+            retval = EINVAL;
+            goto errout;
         }
 
         memset(&otp_req, 0, sizeof(otp_req));
@@ -207,20 +208,21 @@ process_preauth(krb5_context context, void *plugin_context,
                                        &otp_req.enc_data.ciphertext.length);
         if (retval != 0) {
             CLIENT_DEBUG("krb5_c_encrypt_length failed.\n");
-            return retval;
+            goto errout;
         }
 
         otp_req.enc_data.ciphertext.data = (char *) malloc(otp_req.enc_data.ciphertext.length);
         if (otp_req.enc_data.ciphertext.data == NULL) {
             CLIENT_DEBUG("malloc failed.\n");
-            return ENOMEM;
+            retval = ENOMEM;
+            goto errout;
         }
 
         retval = krb5_c_encrypt(context, as_key, KRB5_KEYUSAGE_PA_OTP_REQUEST,
                                 NULL, &otp_challenge->nonce, &otp_req.enc_data);
         if (retval != 0) {
             CLIENT_DEBUG("Failed to encrypt nonce.\n");
-            return retval;
+            goto errout;
         }
 
         pa = calloc(1, sizeof(krb5_pa_data));
