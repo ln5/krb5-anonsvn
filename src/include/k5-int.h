@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- * Copyright (C) 1989,1990,1991,1992,1993,1994,1995,2000,2001,
- * 2003,2006,2007,2008,2009 by the Massachusetts Institute of Technology,
+ * Copyright (C) 1989,1990,1991,1992,1993,1994,1995,2000,2001, 2003,2006,2007,2008,2009 by the Massachusetts Institute of Technology,
  * Cambridge, MA, USA.  All Rights Reserved.
  *
  * This software is being provided to you, the LICENSEE, by the
@@ -40,6 +39,7 @@
  * your software as modified software and not distribute it in such a
  * fashion that it might be confused with the original M.I.T. software.
  */
+
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  *
@@ -643,6 +643,66 @@ struct krb5_key_st {
     void *cache;
 };
 
+/* new encryption provider api */
+
+struct krb5_enc_provider {
+    /* keybytes is the input size to make_key;
+       keylength is the output size */
+    size_t block_size, keybytes, keylength;
+
+    krb5_error_code (*encrypt)(krb5_key key, const krb5_data *cipher_state,
+                               krb5_crypto_iov *data, size_t num_data);
+
+    krb5_error_code (*decrypt)(krb5_key key, const krb5_data *cipher_state,
+                               krb5_crypto_iov *data, size_t num_data);
+
+    /* May be NULL if the cipher is not used for a cbc-mac checksum. */
+    krb5_error_code (*cbc_mac)(krb5_key key, const krb5_crypto_iov *data,
+                               size_t num_data, const krb5_data *ivec,
+                               krb5_data *output);
+
+    krb5_error_code (*make_key)(const krb5_data *randombits,
+                                krb5_keyblock *key);
+
+    krb5_error_code (*init_state)(const krb5_keyblock *key,
+                                  krb5_keyusage keyusage,
+                                  krb5_data *out_state);
+    krb5_error_code (*free_state)(krb5_data *state);
+
+    /* May be NULL if there is no key-derived data cached.  */
+    void (*key_cleanup)(krb5_key key);
+};
+
+struct krb5_hash_provider {
+    char hash_name[8];
+    size_t hashsize, blocksize;
+
+    krb5_error_code (*hash)(const krb5_crypto_iov *data, size_t num_data,
+                            krb5_data *output);
+};
+
+/*
+ * in here to deal with stuff from lib/crypto
+ */
+
+void krb5int_nfold(unsigned int inbits, const unsigned char *in,
+                   unsigned int outbits, unsigned char *out);
+
+krb5_error_code krb5int_hmac(const struct krb5_hash_provider *hash,
+                             krb5_key key, const krb5_crypto_iov *data,
+                             size_t num_data, krb5_data *output);
+
+krb5_error_code
+krb5int_hmac_keyblock(const struct krb5_hash_provider *hash,
+                      const krb5_keyblock *keyblock,
+                      const krb5_crypto_iov *data, size_t num_data,
+                      krb5_data *output);
+
+krb5_error_code krb5int_pbkdf2_hmac_sha1(const krb5_data *, unsigned long,
+                                         const krb5_data *, const krb5_data *);
+
+/* These crypto functions are used by GSSAPI via the accessor. */
+
 krb5_error_code
 krb5int_arcfour_gsscrypt(const krb5_keyblock *keyblock, krb5_keyusage usage,
                          const krb5_data *kd_data, krb5_crypto_iov *data,
@@ -700,6 +760,21 @@ zapfree(void *ptr, size_t len)
     }
 }
 
+/* A definition of init_state for DES based encryption systems.
+ * sets up an 8-byte IV of all zeros
+ */
+
+krb5_error_code
+krb5int_des_init_state(const krb5_keyblock *key, krb5_keyusage keyusage,
+                       krb5_data *new_state);
+
+/*
+ * normally to free a cipher_state you can just memset the length to zero and
+ * free it.
+ */
+krb5_error_code krb5int_default_free_state(krb5_data *state);
+
+
 /*
  * Combine two keys (normally used by the hardware preauth mechanism)
  */
@@ -717,6 +792,13 @@ krb5_error_code krb5int_c_copy_keyblock(krb5_context context,
 krb5_error_code krb5int_c_copy_keyblock_contents(krb5_context context,
                                                  const krb5_keyblock *from,
                                                  krb5_keyblock *to);
+
+/*
+ * Internal - for cleanup.
+ */
+extern void krb5int_prng_cleanup(void);
+extern void krb5int_crypto_impl_cleanup(void);
+
 
 #ifdef KRB5_OLD_CRYPTO
 /* old provider api */
@@ -795,6 +877,7 @@ error(MIT_DES_KEYSIZE does not equal KRB5_MIT_DES_KEYSIZE)
  * Sandia National Laboratories also makes no representations about the
  * suitability of the modifications, or additions to this software for
  * any purpose.  It is provided "as is" without express or implied warranty.
+ *
  */
 #ifndef KRB5_PREAUTH__
 #define KRB5_PREAUTH__
@@ -2062,6 +2145,9 @@ krb5_encode_kdc_rep(krb5_context, krb5_msgtype, const krb5_enc_kdc_rep_part *,
                     int using_subkey, const krb5_keyblock *, krb5_kdc_rep *,
                     krb5_data ** );
 
+krb5_boolean
+krb5int_auth_con_chkseqnum(krb5_context ctx, krb5_auth_context ac,
+                           krb5_ui_4 in_seq);
 /*
  * [De]Serialization Handle and operations.
  */
@@ -2160,6 +2246,35 @@ krb5_error_code
 krb5int_generate_and_save_subkey(krb5_context, krb5_auth_context,
                                  krb5_keyblock * /* Old keyblock, not new!  */,
                                  krb5_enctype);
+
+/* set and change password helpers */
+
+krb5_error_code
+krb5int_mk_chpw_req(krb5_context context, krb5_auth_context auth_context,
+                    krb5_data *ap_req, char *passwd, krb5_data *packet);
+
+krb5_error_code
+krb5int_rd_chpw_rep(krb5_context context, krb5_auth_context auth_context,
+                    krb5_data *packet, int *result_code,
+                    krb5_data *result_data);
+
+krb5_error_code KRB5_CALLCONV
+krb5_chpw_result_code_string(krb5_context context, int result_code,
+                             char **result_codestr);
+
+krb5_error_code
+krb5int_mk_setpw_req(krb5_context context, krb5_auth_context auth_context,
+                     krb5_data *ap_req, krb5_principal targetprinc,
+                     char *passwd, krb5_data *packet);
+
+krb5_error_code
+krb5int_rd_setpw_rep(krb5_context context, krb5_auth_context auth_context,
+                     krb5_data *packet, int *result_code,
+                     krb5_data *result_data);
+
+krb5_error_code
+krb5int_setpw_result_code_string(krb5_context context, int result_code,
+                                 const char **result_codestr);
 
 struct srv_dns_entry {
     struct srv_dns_entry *next;
@@ -2542,6 +2657,10 @@ extern krb5_error_code krb5int_translate_gai_error(int);
 extern krb5_error_code
 krb5int_c_mandatory_cksumtype(krb5_context, krb5_enctype, krb5_cksumtype *);
 
+extern int krb5int_crypto_init (void);
+extern int krb5int_prng_init(void);
+extern int krb5int_crypto_impl_init(void);
+
 /*
  * Referral definitions, debugging hooks, and subfunctions.
  */
@@ -2555,6 +2674,19 @@ void krb5int_dbgref_dump_principal(char *, krb5_principal);
 /* Common hostname-parsing code. */
 krb5_error_code
 krb5int_clean_hostname(krb5_context, const char *, char *, size_t);
+
+krb5_error_code
+krb5int_aes_encrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
+                    size_t num_data);
+
+krb5_error_code
+krb5int_aes_decrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
+                    size_t num_data);
+
+krb5_error_code
+krb5int_camellia_cbc_mac(krb5_key key, const krb5_crypto_iov *data,
+                         size_t num_data, const krb5_data *iv,
+                         krb5_data *output);
 
 #if 0
 /*
@@ -2637,9 +2769,6 @@ krb5_error_code krb5_generate_seq_number(krb5_context, const krb5_keyblock *,
 
 krb5_error_code KRB5_CALLCONV krb5_kt_register(krb5_context,
                                                const struct _krb5_kt_ops *);
-
-krb5_error_code k5_kt_get_principal(krb5_context context, krb5_keytab keytab,
-                                    krb5_principal *princ_out);
 
 krb5_error_code krb5_principal2salt_norealm(krb5_context, krb5_const_principal,
                                             krb5_data *);

@@ -1,8 +1,9 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* kadmin/dbutil/dump.c - Dump a KDC database */
 /*
- * Copyright 1990,1991,2001,2006,2008,2009 by the Massachusetts Institute of
- * Technology.  All Rights Reserved.
+ * kadmin/dbutil/dump.c
+ *
+ * Copyright 1990,1991,2001,2006,2008,2009 by the Massachusetts Institute of Technology.
+ * All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
@@ -22,6 +23,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ * Dump a KDC database
  */
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
@@ -1279,6 +1283,14 @@ dump_db(argc, argv)
         fprintf(arglist.ofile, "%s", dump->header);
 
         if (dump_sno) {
+            if (ulog_map(util_context, global_params.iprop_logfile,
+                         global_params.iprop_ulogsize, FKCOMMAND, db_args)) {
+                fprintf(stderr,
+                        _("%s: Could not map log\n"), progname);
+                exit_status++;
+                goto unlock_and_return;
+            }
+
             /*
              * We grab the lock twice (once again in the iterator call),
              * but that's ok since the lock func handles incr locks held.

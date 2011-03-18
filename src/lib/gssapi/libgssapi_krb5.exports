@@ -1,4 +1,3 @@
-GSS_C_ATTR_LOCAL_LOGIN_USER
 GSS_C_INQ_SSPI_SESSION_KEY
 GSS_C_NT_ANONYMOUS
 GSS_C_NT_EXPORT_NAME
@@ -43,14 +42,12 @@ gss_add_buffer_set_member
 gss_add_cred
 gss_add_cred_impersonate_name
 gss_add_oid_set_member
-gss_authorize_localname
 gss_canonicalize_name
 gss_compare_name
 gss_complete_auth_token
 gss_context_time
 gss_create_empty_buffer_set
 gss_create_empty_oid_set
-gss_decapsulate_token
 gss_delete_name_attribute
 gss_delete_sec_context
 gss_display_mech_attr
@@ -58,7 +55,6 @@ gss_display_name
 gss_display_name_ext
 gss_display_status
 gss_duplicate_name
-gss_encapsulate_token
 gss_export_name
 gss_export_name_composite
 gss_export_sec_context
@@ -106,9 +102,7 @@ gss_nt_service_name
 gss_nt_service_name_v2
 gss_nt_string_uid_name
 gss_nt_user_name
-gss_oid_equal
 gss_oid_to_str
-gss_pname_to_uid
 gss_pseudo_random
 gss_process_context_token
 gss_release_any_name_mapping
@@ -131,7 +125,6 @@ gss_unseal
 gss_unwrap
 gss_unwrap_aead
 gss_unwrap_iov
-gss_userok
 gss_verify
 gss_verify_mic
 gss_wrap

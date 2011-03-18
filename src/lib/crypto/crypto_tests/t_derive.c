@@ -29,7 +29,9 @@
  * With the -v flag, results for all tests are displayed.
  */
 
-#include "crypto_int.h"
+#include "k5-int.h"
+#include "../krb/dk/dk.h"
+#include "enc_provider/enc_provider.h"
 
 struct test {
     krb5_enctype enctype;

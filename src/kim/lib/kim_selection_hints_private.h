@@ -1,5 +1,6 @@
-/* kim/lib/kim_selection_hints_private.h */
 /*
+ * $Header$
+ *
  * Copyright 2006 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

@@ -1,5 +1,6 @@
-/* kim/test/test_kim_common.c */
 /*
+ * $Header$
+ *
  * Copyright 2006 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

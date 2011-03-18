@@ -1,5 +1,8 @@
-/* lib/rpc/auth_gss.c */
 /*
+  auth_gss.c
+
+  RPCSEC_GSS client routines.
+
   Copyright (c) 2000 The Regents of the University of Michigan.
   All rights reserved.
 
@@ -33,8 +36,6 @@
 
   Id: auth_gss.c,v 1.35 2002/10/15 21:25:25 kwc Exp
 */
-
-/* RPCSEC_GSS client routines. */
 
 #include <stdio.h>
 #include <stdlib.h>

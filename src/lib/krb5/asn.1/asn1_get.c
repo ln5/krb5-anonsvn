@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/asn.1/asn1_get.c */
 /*
+ * src/lib/krb5/asn.1/asn1_get.c
+ *
  * Copyright 1994 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

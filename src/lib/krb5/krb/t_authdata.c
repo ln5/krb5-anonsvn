@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/krb/t_authdata.c - Test authorization data search */
 /*
+ * lib/krb5/krb/t_authdata.c
+ *
  * Copyright (C) 2009 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -22,6 +23,10 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ *
+ * Test authorization data search
  */
 
 #include <k5-int.h>

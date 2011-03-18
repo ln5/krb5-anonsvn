@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/gssapi/krb5/export_sec_context.c - Externalize a security context */
 /*
+ * lib/gssapi/krb5/export_sec_context.c
+ *
  * Copyright 1995, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,8 +23,12 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 
+/*
+ * export_sec_context.c - Externalize the security context.
+ */
 #include "gssapiP_krb5.h"
 #ifndef LEAN_CLIENT
 OM_uint32
@@ -43,6 +48,12 @@ krb5_gss_export_sec_context(minor_status, context_handle, interprocess_token)
     obuffer = (krb5_octet *) NULL;
     retval = GSS_S_FAILURE;
     *minor_status = 0;
+
+    if (!kg_validate_ctx_id(*context_handle)) {
+        kret = (OM_uint32) G_VALIDATE_FAILED;
+        retval = GSS_S_NO_CONTEXT;
+        goto error_out;
+    }
 
     ctx = (krb5_gss_ctx_id_t) *context_handle;
     context = ctx->k5_context;

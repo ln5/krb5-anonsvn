@@ -102,6 +102,7 @@ kg_setup_keys(krb5_context context, krb5_gss_ctx_id_rec *ctx, krb5_key subkey,
               krb5_cksumtype *cksumtype)
 {
     krb5_error_code code;
+    krb5int_access kaccess;
 
     assert(ctx != NULL);
     assert(subkey != NULL);
@@ -114,8 +115,12 @@ kg_setup_keys(krb5_context context, krb5_gss_ctx_id_rec *ctx, krb5_key subkey,
         ctx->sealalg = -1;
     }
 
-    code = krb5int_c_mandatory_cksumtype(context, subkey->keyblock.enctype,
-                                         cksumtype);
+    code = krb5int_accessor(&kaccess, KRB5INT_ACCESS_VERSION);
+    if (code != 0)
+        return code;
+
+    code = (*kaccess.mandatory_cksumtype)(context, subkey->keyblock.enctype,
+                                          cksumtype);
     if (code != 0)
         return code;
 
@@ -308,13 +313,18 @@ kg_arcfour_docrypt(const krb5_keyblock *keyblock, int usage,
                    const unsigned char *input_buf, size_t input_len,
                    unsigned char *output_buf)
 {
+    krb5_error_code code;
     krb5_data kd = make_data((char *) kd_data, kd_data_len);
     krb5_crypto_iov kiov;
+    krb5int_access kaccess;
 
+    code = krb5int_accessor(&kaccess, KRB5INT_ACCESS_VERSION);
+    if (code)
+        return code;
     memcpy(output_buf, input_buf, input_len);
     kiov.flags = KRB5_CRYPTO_TYPE_DATA;
     kiov.data = make_data(output_buf, input_len);
-    return krb5int_arcfour_gsscrypt(keyblock, usage, &kd, &kiov, 1);
+    return (*kaccess.arcfour_gsscrypt)(keyblock, usage, &kd, &kiov, 1);
 }
 
 /* AEAD */
@@ -571,15 +581,19 @@ kg_arcfour_docrypt_iov(krb5_context context, const krb5_keyblock *keyblock,
 {
     krb5_error_code code;
     krb5_data kd = make_data((char *) kd_data, kd_data_len);
+    krb5int_access kaccess;
     krb5_crypto_iov *kiov = NULL;
     size_t kiov_len = 0;
 
+    code = krb5int_accessor (&kaccess, KRB5INT_ACCESS_VERSION);
+    if (code)
+        return code;
     code = kg_translate_iov(context, 0 /* proto */, 0 /* dce_style */,
                             0 /* ec */, 0 /* rrc */, keyblock->enctype,
                             iov, iov_count, &kiov, &kiov_len);
     if (code)
         return code;
-    code = krb5int_arcfour_gsscrypt(keyblock, usage, &kd, kiov, kiov_len);
+    code = (*kaccess.arcfour_gsscrypt)(keyblock, usage, &kd, kiov, kiov_len);
     free(kiov);
     return code;
 }
@@ -656,14 +670,13 @@ void
 kg_release_iov(gss_iov_buffer_desc *iov, int iov_count)
 {
     int i;
+    OM_uint32 min_stat;
 
     assert(iov != GSS_C_NO_IOV_BUFFER);
 
     for (i = 0; i < iov_count; i++) {
         if (iov[i].type & GSS_IOV_BUFFER_FLAG_ALLOCATED) {
-            free(iov[i].buffer.value);
-            iov[i].buffer.length = 0;
-            iov[i].buffer.value = NULL;
+            gss_release_buffer(&min_stat, &iov[i].buffer);
             iov[i].type &= ~(GSS_IOV_BUFFER_FLAG_ALLOCATED);
         }
     }
@@ -677,6 +690,7 @@ kg_fixup_padding_iov(OM_uint32 *minor_status, gss_iov_buffer_desc *iov,
     gss_iov_buffer_t data = NULL;
     size_t padlength, relative_padlength;
     unsigned char *p;
+    OM_uint32 minor;
 
     data = kg_locate_iov(iov, iov_count, GSS_IOV_BUFFER_TYPE_DATA);
     padding = kg_locate_iov(iov, iov_count, GSS_IOV_BUFFER_TYPE_PADDING);
@@ -729,11 +743,41 @@ kg_fixup_padding_iov(OM_uint32 *minor_status, gss_iov_buffer_desc *iov,
 
     data->buffer.length -= relative_padlength;
 
-    kg_release_iov(padding, 1);
+    if (padding->type & GSS_IOV_BUFFER_FLAG_ALLOCATED) {
+        gss_release_buffer(&minor, &padding->buffer);
+        padding->type &= ~(GSS_IOV_BUFFER_FLAG_ALLOCATED);
+    }
+
     padding->buffer.length = 0;
     padding->buffer.value = NULL;
 
     return GSS_S_COMPLETE;
+}
+
+int
+kg_map_toktype(int proto, int toktype)
+{
+    int toktype2;
+
+    if (proto)
+        switch (toktype) {
+        case KG_TOK_SIGN_MSG:
+            toktype2 = KG2_TOK_MIC_MSG;
+            break;
+        case KG_TOK_WRAP_MSG:
+            toktype2 = KG2_TOK_WRAP_MSG;
+            break;
+        case KG_TOK_DEL_CTX:
+            toktype2 = KG2_TOK_DEL_CTX;
+            break;
+        default:
+            toktype2 = toktype;
+            break;
+        }
+    else
+        toktype2 = toktype;
+
+    return toktype2;
 }
 
 krb5_boolean

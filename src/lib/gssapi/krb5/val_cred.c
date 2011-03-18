@@ -21,12 +21,15 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 
 #include "gssapiP_krb5.h"
 
-/* Check to see whether or not a GSSAPI krb5 credential is valid.  If
- * it is not, return an error. */
+/*
+ * Check to see whether or not a GSSAPI krb5 credential is valid.  If
+ * it is not, return an error.
+ */
 
 OM_uint32
 krb5_gss_validate_cred_1(OM_uint32 *minor_status, gss_cred_id_t cred_handle,
@@ -35,6 +38,11 @@ krb5_gss_validate_cred_1(OM_uint32 *minor_status, gss_cred_id_t cred_handle,
     krb5_gss_cred_id_t cred;
     krb5_error_code code;
     krb5_principal princ;
+
+    if (!kg_validate_cred_id(cred_handle)) {
+        *minor_status = (OM_uint32) G_VALIDATE_FAILED;
+        return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_DEFECTIVE_CREDENTIAL);
+    }
 
     cred = (krb5_gss_cred_id_t) cred_handle;
 

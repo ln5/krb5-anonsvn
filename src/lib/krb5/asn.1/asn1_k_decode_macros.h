@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/asn.1/asn1_k_decode_macros.h */
 /*
+ * src/lib/krb5/asn.1/asn1_k_decode_macros.h
+ *
  * Copyright 1994, 2007, 2008, 2010 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -351,7 +352,7 @@ asn1_get_eoc_tag (asn1buf *buf)
  * Like end_sequence_of(), but uses the different (non-shadowing)
  * variable names.
  */
-static inline asn1_error_code
+static asn1_error_code
 end_sequence_of_no_tagvars_helper(asn1buf *buf, asn1buf *seqbufp,
                                   int seqofindef)
 {

@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* kdc/kdc_util.h */
 /*
+ * kdc/kdc_util.h
+ *
  * Portions Copyright (C) 2007 Apple Inc.
  * Copyright 1990, 2007 by the Massachusetts Institute of Technology.
  *
@@ -354,8 +355,7 @@ krb5_error_code
 kdc_fast_handle_error (krb5_context context,
                        struct kdc_request_state *state,
                        krb5_kdc_req *request,
-                       krb5_pa_data  **in_padata, krb5_error *err,
-                       krb5_data **fast_edata_out);
+                       krb5_pa_data  **in_padata, krb5_error *err);
 
 krb5_error_code kdc_fast_handle_reply_key(struct kdc_request_state *state,
                                           krb5_keyblock *existing_key,

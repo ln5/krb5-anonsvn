@@ -1,5 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
+ * include/krb5/kdb.h
+ *
  * Copyright 1990,1991 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -21,7 +23,11 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ * KDC Database interface definitions.
  */
+
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  *
@@ -47,12 +53,11 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-/* KDC Database interface definitions */
 
 /* This API is not considered as stable as the main krb5 API.
  *
@@ -757,8 +762,8 @@ krb5_dbe_free_tl_data(krb5_context, krb5_tl_data *);
 
 /*
  * A krb5_context can hold one database object.  Modules should use
- * krb5_db_set_context and krb5_db_get_context to store state associated with
- * the database object.
+ * context->dal_handle->db_context to store state associated with the database
+ * object.
  *
  * Some module functions are mandatory for KDC operation; others are optional
  * or apply only to administrative operations.  If a function is optional, a
@@ -832,8 +837,13 @@ typedef struct _kdb_vftabl {
                                char **db_args);
 
     /*
-     * Deprecated: No longer used as of krb5 1.10; can be removed in the next
-     * DAL revision.  Modules should leave as NULL.
+     * Optional: Set *age to the last modification time of the database.  Used
+     * by the KDC lookaside cache to ensure that lookaside entries are not used
+     * if the database has changed since the entry was recorded.
+     *
+     * If this function is unimplemented, lookaside cache entries will
+     * effectively expire immediately.  Another option is to supply the current
+     * time, which will cause lookaside cache entries to last for one second.
      */
     krb5_error_code (*get_age)(krb5_context kcontext, char *db_name,
                                time_t *age);

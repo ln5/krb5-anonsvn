@@ -229,7 +229,7 @@ MAKE=-$(MAKE)
 !endif
 
 CRYPTO_IMPL	= builtin
-PRNG_ALG	= fortuna
+PRNG_ALG	= yarrow
 
 CFLAGS = $(CCOPTS)
 ALL_CFLAGS = $(DEFS) $(DEFINES) $(LOCALINCLUDES) $(CPPFLAGS) $(CFLAGS)

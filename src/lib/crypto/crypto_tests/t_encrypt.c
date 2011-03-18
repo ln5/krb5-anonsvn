@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/crypto/crypto_tests/t_encrypt.c */
 /*
+ * lib/crypto/t_encrypt.c
+ *
  * Copyright 2001, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,9 +23,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- */
-
-/*
+ *
  *
  * <<< Description >>>
  */
@@ -32,7 +31,8 @@
  * Some black-box tests of crypto systems.  Make sure that we can decrypt things we encrypt, etc.
  */
 
-#include "crypto_int.h"
+#include "k5-int.h"
+#include "etypes.h"
 #include <stdio.h>
 
 /* What enctypes should we test?*/

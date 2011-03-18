@@ -19,10 +19,6 @@
 #include "kdb_log.h"
 #include "kdb5int.h"
 
-#ifndef MAP_FAILED
-#define MAP_FAILED ((void *)-1)
-#endif
-
 /*
  * This modules includes all the necessary functions that create and
  * modify the Kerberos principal update and header logs.
@@ -606,7 +602,7 @@ ulog_map(krb5_context context, const char *logname, uint32_t ulogentries,
                                   PROT_READ+PROT_WRITE, MAP_SHARED, ulogfd, 0);
     }
 
-    if (ulog == MAP_FAILED) {
+    if ((int)(ulog) == -1) {
         /*
          * Can't map update log file to memory
          */
@@ -905,7 +901,7 @@ ulog_set_role(krb5_context ctx, iprop_role role)
  */
 static int extend_file_to(int fd, uint_t new_size)
 {
-    off_t current_offset;
+    int current_offset;
     static const char zero[512] = { 0, };
 
     current_offset = lseek(fd, 0, SEEK_END);
@@ -915,7 +911,7 @@ static int extend_file_to(int fd, uint_t new_size)
         errno = EINVAL;
         return -1;
     }
-    while (current_offset < (off_t)new_size) {
+    while (current_offset < new_size) {
         int write_size, wrote_size;
         write_size = new_size - current_offset;
         if (write_size > 512)

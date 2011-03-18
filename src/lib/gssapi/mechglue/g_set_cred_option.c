@@ -20,9 +20,12 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 
-/* Glue routine for gssspi_set_cred_option */
+/*
+ *  glue routine for gssspi_set_cred_option
+ */
 
 #include "mglueP.h"
 #include <stdio.h>

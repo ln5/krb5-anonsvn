@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/kadm5/admin.h */
 /*
+ * lib/kadm5/admin.h
+ *
  * Copyright 2001, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,6 +23,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved

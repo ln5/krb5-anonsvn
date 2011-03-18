@@ -16,21 +16,27 @@
 
 #define RFC3244_VERSION 0xff80
 
-static krb5_error_code
-process_chpw_request(krb5_context context, void *server_handle, char *realm,
-                     krb5_keytab keytab, const krb5_fulladdr *local_faddr,
-                     const krb5_fulladdr *remote_faddr, krb5_data *req,
-                     krb5_data *rep)
+krb5_error_code
+process_chpw_request(context, server_handle, realm, keytab,
+                     local_faddr, remote_faddr, req, rep)
+    krb5_context context;
+    void *server_handle;
+    char *realm;
+    krb5_keytab keytab;
+    krb5_fulladdr *local_faddr;
+    krb5_fulladdr *remote_faddr;
+    krb5_data *req;
+    krb5_data *rep;
 {
     krb5_error_code ret;
     char *ptr;
-    unsigned int plen, vno;
-    krb5_data ap_req, ap_rep = empty_data();
-    krb5_data cipher = empty_data(), clear = empty_data();
-    krb5_auth_context auth_context = NULL;
-    krb5_principal changepw = NULL;
+    int plen, vno;
+    krb5_data ap_req, ap_rep;
+    krb5_auth_context auth_context;
+    krb5_principal changepw;
     krb5_principal client, target = NULL;
-    krb5_ticket *ticket = NULL;
+    krb5_ticket *ticket;
+    krb5_data cipher, clear;
     krb5_replay_data replay;
     krb5_error krberror;
     int numresult;
@@ -44,7 +50,15 @@ process_chpw_request(krb5_context context, void *server_handle, char *realm,
     char addrbuf[100];
     krb5_address *addr = remote_faddr->address;
 
-    *rep = empty_data();
+    ret = 0;
+    rep->length = 0;
+
+    auth_context = NULL;
+    changepw = NULL;
+    ap_rep.length = 0;
+    ticket = NULL;
+    clear.length = 0;
+    cipher.length = 0;
 
     if (req->length < 4) {
         /* either this, or the server is printing bad messages,
@@ -62,13 +76,8 @@ process_chpw_request(krb5_context context, void *server_handle, char *realm,
     plen = (*ptr++ & 0xff);
     plen = (plen<<8) | (*ptr++ & 0xff);
 
-    if (plen != req->length) {
-        ret = KRB5KRB_AP_ERR_MODIFIED;
-        numresult = KRB5_KPASSWD_MALFORMED;
-        strlcpy(strresult, "Request length was inconsistent",
-                sizeof(strresult));
-        goto chpwfail;
-    }
+    if (plen != req->length)
+        return(KRB5KRB_AP_ERR_MODIFIED);
 
     /* verify version number */
 
@@ -196,7 +205,8 @@ process_chpw_request(krb5_context context, void *server_handle, char *realm,
             goto chpwfail;
         }
 
-        zapfree(clear.data, clear.length);
+        memset(clear.data, 0, clear.length);
+        free(clear.data);
 
         clear = *clear_data;
         free(clear_data);
@@ -242,9 +252,11 @@ process_chpw_request(krb5_context context, void *server_handle, char *realm,
         errmsg = krb5_get_error_message(context, ret);
 
     /* zap the password */
-    zapfree(clear.data, clear.length);
-    zapfree(ptr, clear.length);
-    clear = empty_data();
+    memset(clear.data, 0, clear.length);
+    memset(ptr, 0, clear.length);
+    free(clear.data);
+    free(ptr);
+    clear.length = 0;
 
     clen = strlen(clientstr);
     trunc_name(&clen, &cdots);
@@ -318,16 +330,15 @@ process_chpw_request(krb5_context context, void *server_handle, char *realm,
     case KADM5_PASS_REUSE:
     case KADM5_PASS_Q_CLASS:
     case KADM5_PASS_Q_DICT:
-    case KADM5_PASS_Q_GENERIC:
     case KADM5_PASS_TOOSOON:
-        numresult = KRB5_KPASSWD_SOFTERROR;
+        numresult = KRB5_KPASSWD_HARDERROR;
         break;
     case 0:
         numresult = KRB5_KPASSWD_SUCCESS;
         strlcpy(strresult, "", sizeof(strresult));
         break;
     default:
-        numresult = KRB5_KPASSWD_HARDERROR;
+        numresult = KRB5_KPASSWD_SOFTERROR;
         break;
     }
 
@@ -343,7 +354,7 @@ chpwfail:
 
     memcpy(ptr, strresult, strlen(strresult));
 
-    cipher = empty_data();
+    cipher.length = 0;
 
     if (ap_rep.length) {
         ret = krb5_auth_con_setaddrs(context, auth_context,
@@ -373,7 +384,7 @@ chpwfail:
 
         if (ap_rep.length) {
             free(ap_rep.data);
-            ap_rep = empty_data();
+            ap_rep.length = 0;
         }
 
         krberror.ctime = 0;
@@ -410,9 +421,13 @@ chpwfail:
 
     /* construct the reply */
 
-    ret = alloc_data(rep, 6 + ap_rep.length + cipher.length);
-    if (ret)
+    rep->length = 6 + ap_rep.length + cipher.length;
+    rep->data = (char *) malloc(rep->length);
+    if (rep->data == NULL) {
+        rep->length = 0;        /* checked by caller */
+        ret = ENOMEM;
         goto bailout;
+    }
     ptr = rep->data;
 
     /* length */
@@ -442,33 +457,43 @@ chpwfail:
     memcpy(ptr, cipher.data, cipher.length);
 
 bailout:
-    krb5_auth_con_free(context, auth_context);
-    krb5_free_principal(context, changepw);
-    krb5_free_ticket(context, ticket);
-    free(ap_rep.data);
-    free(clear.data);
-    free(cipher.data);
-    krb5_free_principal(context, target);
-    krb5_free_unparsed_name(context, targetstr);
-    krb5_free_unparsed_name(context, clientstr);
-    krb5_free_error_message(context, errmsg);
-    return ret;
+    if (auth_context)
+        krb5_auth_con_free(context, auth_context);
+    if (changepw)
+        krb5_free_principal(context, changepw);
+    if (ap_rep.length)
+        free(ap_rep.data);
+    if (ticket)
+        krb5_free_ticket(context, ticket);
+    if (clear.length)
+        free(clear.data);
+    if (cipher.length)
+        free(cipher.data);
+    if (target)
+        krb5_free_principal(context, target);
+    if (targetstr)
+        krb5_free_unparsed_name(context, targetstr);
+    if (clientstr)
+        krb5_free_unparsed_name(context, clientstr);
+    if (errmsg)
+        krb5_free_error_message(context, errmsg);
+
+    return(ret);
 }
 
 /* Dispatch routine for set/change password */
 krb5_error_code
 dispatch(void *handle,
          struct sockaddr *local_saddr, const krb5_fulladdr *remote_faddr,
-         krb5_data *request, krb5_data **response_out, int is_tcp)
+         krb5_data *request, krb5_data **response, int is_tcp)
 {
     krb5_error_code ret;
     krb5_keytab kt = NULL;
     kadm5_server_handle_t server_handle = (kadm5_server_handle_t)handle;
     krb5_fulladdr local_faddr;
     krb5_address **local_kaddrs = NULL, local_kaddr_buf;
-    krb5_data *response = NULL;
 
-    *response_out = NULL;
+    *response = NULL;
 
     if (local_saddr == NULL) {
         ret = krb5_os_localaddr(server_handle->context, &local_kaddrs);
@@ -489,9 +514,11 @@ dispatch(void *handle,
         goto cleanup;
     }
 
-    response = k5alloc(sizeof(krb5_data), &ret);
-    if (response == NULL)
+    *response = (krb5_data *)malloc(sizeof(krb5_data));
+    if (*response == NULL) {
+        ret = ENOMEM;
         goto cleanup;
+    }
 
     ret = process_chpw_request(server_handle->context,
                                handle,
@@ -500,16 +527,13 @@ dispatch(void *handle,
                                &local_faddr,
                                remote_faddr,
                                request,
-                               response);
-    if (ret)
-        goto cleanup;
-
-    *response_out = response;
-    response = NULL;
+                               *response);
 
 cleanup:
-    krb5_free_addresses(server_handle->context, local_kaddrs);
-    krb5_free_data(server_handle->context, response);
+    if (local_kaddrs != NULL)
+        krb5_free_addresses(server_handle->context, local_kaddrs);
+
     krb5_kt_close(server_handle->context, kt);
+
     return ret;
 }

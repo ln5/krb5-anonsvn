@@ -1,5 +1,6 @@
-/* kim/lib/mac/kim_os_identity.c */
 /*
+ * $Header$
+ *
  * Copyright 2006 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

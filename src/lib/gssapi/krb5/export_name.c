@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/gssapi/krb5/export_name.c */
 /*
+ * lib/gssapi/krb5/export_name.c
+ *
  * Copyright 1997, 2007 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,6 +23,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 
 #include "gssapiP_krb5.h"
@@ -48,6 +50,13 @@ OM_uint32 krb5_gss_export_name(OM_uint32  *minor_status,
 
     exported_name->length = 0;
     exported_name->value = NULL;
+
+    if (! kg_validate_name(input_name)) {
+        if (minor_status)
+            *minor_status = (OM_uint32) G_VALIDATE_FAILED;
+        krb5_free_context(context);
+        return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_BAD_NAME);
+    }
 
     if ((code = krb5_unparse_name(context, ((krb5_gss_name_t) input_name)->princ,
                                   &str))) {

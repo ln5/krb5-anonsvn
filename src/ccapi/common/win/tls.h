@@ -1,5 +1,6 @@
-/* ccapi/common/win/tls.h */
 /*
+ * $Header$
+ *
  * Copyright 2008 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

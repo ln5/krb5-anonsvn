@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* kadmin/dbutil/kdb5_util.c - Administer a KDC database */
 /*
+ * admin/edit/kdb5_edit.c
+ *
  * (C) Copyright 1990,1991, 1996, 2008, 2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,7 +23,11 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ * Edit a KDC database.
  */
+
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  *
@@ -48,6 +53,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -491,17 +497,6 @@ static int open_db_and_mkey()
         krb5_free_keyblock_contents(util_context, &master_keyblock);
         krb5_db_free_mkey_list(util_context, master_keylist);
         return(1);
-    }
-
-    if (global_params.iprop_enabled) {
-        if (ulog_map(util_context, global_params.iprop_logfile,
-                     global_params.iprop_ulogsize, FKCOMMAND,
-                     db5util_db_args)) {
-            fprintf(stderr, _("%s: Could not map log\n"),
-                    progname);
-            exit_status++;
-            return(1);
-        }
     }
 
     valid_master_key = 1;

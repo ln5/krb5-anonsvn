@@ -226,13 +226,13 @@ process_preauth(krb5_context context, void *plugin_context,
         pa = calloc(1, sizeof(krb5_pa_data));
         if (pa == NULL) {
             retval = ENOMEM;
-            goto done;
+            goto errout;
         }
 
         pa_array = calloc(2, sizeof(krb5_pa_data *));
         if (pa_array == NULL) {
             retval = ENOMEM;
-            goto done;
+            goto errout;
         }
 
         if (otp_ctx->otp == NULL) {
@@ -244,7 +244,7 @@ process_preauth(krb5_context context, void *plugin_context,
 
         retval = encode_krb5_pa_otp_req(&otp_req, &encoded_otp_req);
         if (retval != 0) {
-            goto done;
+            goto errout;
         }
 
         pa->length = encoded_otp_req->length;
@@ -262,13 +262,16 @@ process_preauth(krb5_context context, void *plugin_context,
 
     return 0;
 
-done:
-    free(pa_array);
-    free(pa);
+ errout:
+    if (pa_array)
+        free(pa_array);
+    if (pa)
+        free(pa);
 
     return retval;
 }
 
+/* Server.  */
 static krb5_error_code
 check_token_id(krb5_context kcontext, const char *token,
                const krb5_principal principal,

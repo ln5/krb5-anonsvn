@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/kadm5/logger.c */
 /*
+ * lib/kadm/logger.c
+ *
  * Copyright 1995, 2007 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,6 +23,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 
 /* KADM5 wants non-syslog log files to contain syslog-like entries */
@@ -200,7 +202,7 @@ klog_com_err_proc(const char *whoami, long int code, const char *format, va_list
 
     /* If reporting an error message, separate it. */
     if (code) {
-        const char *emsg;
+        char *emsg;
         outbuf[sizeof(outbuf) - 1] = '\0';
 
         emsg = krb5_get_error_message (err_context, code);

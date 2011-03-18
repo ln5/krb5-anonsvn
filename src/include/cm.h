@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* include/cm.h */
 /*
+ * include/cm.h
+ *
  * Copyright 2002 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -24,20 +25,11 @@
  * or implied warranty.
  */
 
-/*
- * Since fd_set is large on some platforms (8K on AIX 5.2), this probably
- * shouldn't be allocated in automatic storage.  Define USE_POLL and
- * MAX_POLLFDS in the consumer of this header file to use poll state instead of
- * select state.
- */
+/* Since fd_set is large on some platforms (8K on AIX 5.2), this
+   probably shouldn't be allocated in automatic storage.  */
 struct select_state {
-#ifdef USE_POLL
-    struct pollfd fds[MAX_POLLFDS];
-#else
-    int max;
+    int max, nfds;
     fd_set rfds, wfds, xfds;
-#endif
-    int nfds;
     struct timeval end_time;    /* magic: tv_sec==0 => never time out */
 };
 

@@ -1,5 +1,6 @@
-/* ccapi/server/win/ccs_request_proc.c */
 /*
+ * $Header$
+ *
  * Copyright 2008 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

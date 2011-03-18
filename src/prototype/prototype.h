@@ -1,5 +1,5 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* prototype/prototype.h - <<< One-line description of file >>> */
+/* prototype/prototype.h */
 /*
  * Copyright (C) 2011 by the Massachusetts Institute of Technology.
  * All rights reserved.
@@ -25,7 +25,7 @@
  */
 
 /*
- * <<< Longer description of file >>>
+ * <<< Description >>>
  */
 
 #ifndef <<< include blocker>>>__

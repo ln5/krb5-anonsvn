@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/os/init_os_ctx.c */
 /*
+ * lib/krb5/os/init_ctx.c
+ *
  * Copyright 1994, 2007, 2008, 2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,6 +23,8 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ * krb5_init_contex()
  */
 
 #define NEED_WINDOWS
@@ -380,18 +383,23 @@ krb5_os_init_context(krb5_context ctx, krb5_boolean kdc)
     ctx->preauth_context = NULL;
 
     retval = os_init_paths(ctx, kdc);
-    if (retval)
-        return retval;
+    /*
+     * If there's an error in the profile, return an error.  Just
+     * ignoring the error is a Bad Thing (tm).
+     */
+
+    if (!retval) {
+        krb5_cc_set_default_name(ctx, NULL);
 
 #ifdef _WIN32
-    /* We initialize winsock to version 1.1 but
-     * we do not care if we succeed or fail.
-     */
-    wVersionRequested = 0x0101;
-    WSAStartup (wVersionRequested, &wsaData);
+        /* We initialize winsock to version 1.1 but
+         * we do not care if we succeed or fail.
+         */
+        wVersionRequested = 0x0101;
+        WSAStartup (wVersionRequested, &wsaData);
 #endif /* _WIN32 */
-
-    return 0;
+    }
+    return retval;
 }
 
 krb5_error_code KRB5_CALLCONV

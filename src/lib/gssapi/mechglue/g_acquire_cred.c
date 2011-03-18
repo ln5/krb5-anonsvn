@@ -103,11 +103,14 @@ gss_OID_set *		actual_mechs;
 OM_uint32 *		time_rec;
 
 {
-    OM_uint32 major = GSS_S_FAILURE, tmpMinor;
+    OM_uint32 major = GSS_S_FAILURE;
     OM_uint32 initTimeOut, acceptTimeOut, outTime = GSS_C_INDEFINITE;
-    gss_OID_set mechs = GSS_C_NO_OID_SET;
+    gss_OID_set_desc default_OID_set;
+    gss_OID_set mechs;
+    gss_OID_desc default_OID;
+    gss_mechanism mech;
     unsigned int i;
-    gss_union_cred_t creds = NULL;
+    gss_union_cred_t creds;
 
     major = val_acq_cred_args(minor_status,
 			      desired_name,
@@ -118,37 +121,44 @@ OM_uint32 *		time_rec;
 			      actual_mechs,
 			      time_rec);
     if (major != GSS_S_COMPLETE)
-	goto cleanup;
+	return (major);
+
+    /* Initial value needed below. */
+    major = GSS_S_FAILURE;
 
     /*
-     * if desired_mechs equals GSS_C_NULL_OID_SET, then try to
-     * acquire credentials for all mechanisms.
+     * if desired_mechs equals GSS_C_NULL_OID_SET, then pick an
+     * appropriate default.  We use the first mechanism in the
+     * mechansim list as the default. This set is created with
+     * statics thus needs not be freed
      */
-    if (desired_mechs == GSS_C_NULL_OID_SET) {
-	major = gss_indicate_mechs(minor_status, &mechs);
-	if (major != GSS_S_COMPLETE)
-	    goto cleanup;
+    if(desired_mechs == GSS_C_NULL_OID_SET) {
+	mech = gssint_get_mechanism(NULL);
+	if (mech == NULL)
+	    return (GSS_S_BAD_MECH);
+
+	mechs = &default_OID_set;
+	default_OID_set.count = 1;
+	default_OID_set.elements = &default_OID;
+	default_OID.length = mech->mech_type.length;
+	default_OID.elements = mech->mech_type.elements;
     } else
 	mechs = desired_mechs;
 
-    if (mechs->count == 0) {
-	major = GSS_S_BAD_MECH;
-	goto cleanup;
-    }
+    if (mechs->count == 0)
+	return (GSS_S_BAD_MECH);
 
     /* allocate the output credential structure */
-    creds = (gss_union_cred_t)calloc(1, sizeof (gss_union_cred_desc));
-    if (creds == NULL) {
-	major = GSS_S_FAILURE;
-	*minor_status = ENOMEM;
-	goto cleanup;
-    }
+    creds = (gss_union_cred_t)malloc(sizeof (gss_union_cred_desc));
+    if (creds == NULL)
+	return (GSS_S_FAILURE);
 
-    creds->count = 0;
+    /* initialize to 0s */
+    (void) memset(creds, 0, sizeof (gss_union_cred_desc));
     creds->loopback = creds;
 
     /* for each requested mech attempt to obtain a credential */
-    for (i = 0, major = GSS_S_UNAVAILABLE; i < mechs->count; i++) {
+    for (i = 0; i < mechs->count; i++) {
 	major = gss_add_cred(minor_status, (gss_cred_id_t)creds,
 			     desired_name,
 			     &mechs->elements[i],
@@ -178,8 +188,10 @@ OM_uint32 *		time_rec;
     } /* for */
 
     /* ensure that we have at least one credential element */
-    if (creds->count < 1)
-	goto cleanup;
+    if (creds->count < 1) {
+	free(creds);
+	return (major);
+    }
 
     /*
      * fill in output parameters
@@ -192,22 +204,20 @@ OM_uint32 *		time_rec;
 	oids.elements = creds->mechs_array;
 
 	major = generic_gss_copy_oid_set(minor_status, &oids, actual_mechs);
-	if (GSS_ERROR(major))
-	    goto cleanup;
+	if (GSS_ERROR(major)) {
+	    (void) gss_release_cred(minor_status,
+				    (gss_cred_id_t *)&creds);
+	    return (major);
+	}
     }
 
     if (time_rec)
 	*time_rec = outTime;
 
+
+    creds->loopback = creds;
     *output_cred_handle = (gss_cred_id_t)creds;
-
-cleanup:
-    if (GSS_ERROR(major))
-	gss_release_cred(&tmpMinor, (gss_cred_id_t *)&creds);
-    if (desired_mechs == GSS_C_NO_OID_SET)
-        generic_gss_release_oid_set(&tmpMinor, &mechs);
-
-    return (major);
+    return (GSS_S_COMPLETE);
 }
 
 static OM_uint32

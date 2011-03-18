@@ -1,5 +1,6 @@
-/* lib/crypto/crypto_tests/camellia-test.c */
 /*
+ * lib/crypto/camellia/camellia-test.c
+ *
  * Copyright (c) 2009
  * NTT (Nippon Telegraph and Telephone Corporation) . All rights reserved.
  *

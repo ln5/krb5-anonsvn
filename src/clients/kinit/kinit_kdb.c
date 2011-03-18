@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* clients/kinit/kinit_kdb.c */
 /*
+ * clients/kinit/kinit_kdb.c
+ *
  * Copyright (C) 2010 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -22,8 +23,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- */
-
+ *
+ *
+  */
 /**
  *    @file kinit_kdb.c
  *    Operations to open the KDB and make the KDB key table available

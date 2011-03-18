@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* kdc/extern.h */
 /*
+ * kdc/extern.h
+ *
  * Copyright 1990,2001,2007,2009 by the Massachusetts Institute of Technology.
  *
  * Export of this software from the United States of America may
@@ -21,6 +22,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ * <<< Description >>>
  */
 
 #ifndef __KRB5_KDC_EXTERN__

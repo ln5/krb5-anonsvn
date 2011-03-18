@@ -1,11 +1,11 @@
-/* lib/gssapi/mechglue/mglueP.h */
+/* #ident  "@(#)mglueP.h 1.2     96/01/18 SMI" */
 
 /*
+ * This header contains the private mechglue definitions.
+ *
  * Copyright (c) 1995, by Sun Microsystems, Inc.
  * All rights reserved.
  */
-
-/* This header contains the private mechglue definitions. */
 
 #ifndef _GSS_MECHGLUEP_H
 #define _GSS_MECHGLUEP_H
@@ -335,31 +335,27 @@ typedef struct gss_config {
 		    OM_uint32,		/* req_output_size */
 		    OM_uint32 *		/* max_input_size */
 	 );
-    OM_uint32	     (*gss_pname_to_uid)
+#if 0
+    int		     (*pname_to_uid)
 	(
-		    OM_uint32 *,        /* minor */
-		    const gss_name_t,	/* name */
-		    const gss_OID,	/* mech_type */
+		    char *,		/* pname */
+		    gss_OID,		/* name type */
+		    gss_OID,		/* mech type */
 		    uid_t *		/* uid */
-	    );
-	OM_uint32		(*gssspi_authorize_localname)
+		    );
+	OM_uint32		(*gssint_userok)
 	(
 		    OM_uint32 *,	/* minor_status */
 		    const gss_name_t,	/* pname */
-		    gss_const_buffer_t,	/* local user */
-		    gss_const_OID	/* local nametype */
+		    const char *,	/* local user */
+		    int *		/* user ok? */
 	/* */);
+#endif
 	OM_uint32		(*gss_export_name)
 	(
 		OM_uint32 *,		/* minor_status */
 		const gss_name_t,	/* input_name */
 		gss_buffer_t		/* exported_name */
-	/* */);
-        OM_uint32       (*gss_duplicate_name)
-	(
-		    OM_uint32*,		/* minor_status */
-		    const gss_name_t,	/* input_name */
-		    gss_name_t *	/* output_name */
 	/* */);
 	OM_uint32	(*gss_store_cred)
 	(
@@ -721,6 +717,14 @@ OM_uint32
 gssint_get_mechanisms(
 	char *mechArray[],		/* array to populate with mechs */
 	int arrayLen			/* length of passed in array */
+);
+
+OM_uint32
+gssint_userok(
+	OM_uint32 *,		/* minor */
+	const gss_name_t,	/* name */
+	const char *,		/* user */
+	int *			/* user_ok */
 );
 
 int

@@ -345,6 +345,12 @@ kg_seal(minor_status, context_handle, conf_req_flag, qop_req,
         return GSS_S_FAILURE;
     }
 
+    /* validate the context handle */
+    if (! kg_validate_ctx_id(context_handle)) {
+        *minor_status = (OM_uint32) G_VALIDATE_FAILED;
+        return(GSS_S_NO_CONTEXT);
+    }
+
     ctx = (krb5_gss_ctx_id_rec *) context_handle;
 
     if (! ctx->established) {
@@ -385,35 +391,4 @@ kg_seal(minor_status, context_handle, conf_req_flag, qop_req,
 
     *minor_status = 0;
     return(GSS_S_COMPLETE);
-}
-
-OM_uint32
-krb5_gss_wrap(minor_status, context_handle, conf_req_flag,
-              qop_req, input_message_buffer, conf_state,
-              output_message_buffer)
-    OM_uint32           *minor_status;
-    gss_ctx_id_t        context_handle;
-    int                 conf_req_flag;
-    gss_qop_t           qop_req;
-    gss_buffer_t        input_message_buffer;
-    int                 *conf_state;
-    gss_buffer_t        output_message_buffer;
-{
-    return(kg_seal(minor_status, context_handle, conf_req_flag,
-                   qop_req, input_message_buffer, conf_state,
-                   output_message_buffer, KG_TOK_WRAP_MSG));
-}
-
-OM_uint32
-krb5_gss_get_mic(minor_status, context_handle, qop_req,
-                 message_buffer, message_token)
-    OM_uint32           *minor_status;
-    gss_ctx_id_t        context_handle;
-    gss_qop_t           qop_req;
-    gss_buffer_t        message_buffer;
-    gss_buffer_t        message_token;
-{
-    return(kg_seal(minor_status, context_handle, 0,
-                   qop_req, message_buffer, NULL,
-                   message_token, KG_TOK_MIC_MSG));
 }

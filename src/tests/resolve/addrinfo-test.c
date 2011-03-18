@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* tests/resolve/addrinfo-test.c */
 /*
+ * test/resolve/addrinfo-test.c
+ *
  * Copyright 2004 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,9 +23,8 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- */
-
-/*
+ *
+ *
  * A simple program to test the functionality of the getaddrinfo function.
  *
  * Usage:
@@ -34,6 +34,7 @@
  *   which (at least with a non-null "port") means a socket address
  *   is desired that can be used with connect() or bind() (depending
  *   on whether "-P" is given).
+ *
  */
 
 #include <stdio.h>

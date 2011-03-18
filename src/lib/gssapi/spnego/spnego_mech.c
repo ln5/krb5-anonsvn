@@ -20,7 +20,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
+
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -243,10 +245,7 @@ static struct gss_config spnego_mechanism =
 	spnego_gss_inquire_context,	/* gss_inquire_context */
 	NULL,				/* gss_internal_release_oid */
 	spnego_gss_wrap_size_limit,	/* gss_wrap_size_limit */
-	NULL,				/* gssd_pname_to_uid */
-	NULL,				/* gss_userok */
 	NULL,				/* gss_export_name */
-	spnego_gss_duplicate_name,	/* gss_duplicate_name */
 	NULL,				/* gss_store_cred */
  	spnego_gss_inquire_sec_context_by_oid, /* gss_inquire_sec_context_by_oid */
  	spnego_gss_inquire_cred_by_oid,	/* gss_inquire_cred_by_oid */
@@ -1856,23 +1855,6 @@ spnego_gss_release_name(
 	return (status);
 }
 
-/*ARGSUSED*/
-OM_uint32
-spnego_gss_duplicate_name(
-			OM_uint32 *minor_status,
-			const gss_name_t input_name,
-			gss_name_t *output_name)
-{
-	OM_uint32 status;
-
-	dsyslog("Entering duplicate_name\n");
-
-	status = gss_duplicate_name(minor_status, input_name, output_name);
-
-	dsyslog("Leaving duplicate_name\n");
-	return (status);
-}
-
 OM_uint32
 spnego_gss_inquire_cred(
 			OM_uint32 *minor_status,
@@ -2092,18 +2074,14 @@ spnego_gss_delete_sec_context(
 	spnego_gss_ctx_id_t *ctx =
 		    (spnego_gss_ctx_id_t *)context_handle;
 
-	*minor_status = 0;
-
 	if (context_handle == NULL)
 		return (GSS_S_FAILURE);
-
-	if (*ctx == NULL)
-		return (GSS_S_COMPLETE);
 
 	/*
 	 * If this is still an SPNEGO mech, release it locally.
 	 */
-	if ((*ctx)->magic_num == SPNEGO_MAGIC_ID) {
+	if (*ctx != NULL &&
+	    (*ctx)->magic_num == SPNEGO_MAGIC_ID) {
 		(void) gss_delete_sec_context(minor_status,
 				    &(*ctx)->ctx_handle,
 				    output_token);

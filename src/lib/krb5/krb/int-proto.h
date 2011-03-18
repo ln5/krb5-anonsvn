@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/krb/int-proto.h - Prototypes for libkrb5 internal functions */
 /*
+ * lib/krb5/krb/int-proto.h
+ *
  * Copyright 1990,1991 the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,7 +23,11 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ * Function prototypes for Kerberos V5 library internal functions.
  */
+
 
 #ifndef KRB5_INT_FUNC_PROTO__
 #define KRB5_INT_FUNC_PROTO__
@@ -151,31 +156,5 @@ krb5int_validate_times(krb5_context, krb5_ticket_times *);
 
 krb5_error_code
 krb5int_copy_authdatum(krb5_context, const krb5_authdata *, krb5_authdata **);
-
-krb5_boolean
-k5_privsafe_check_seqnum(krb5_context ctx, krb5_auth_context ac,
-                         krb5_ui_4 in_seq);
-
-krb5_error_code
-k5_privsafe_check_addrs(krb5_context context, krb5_auth_context ac,
-                        krb5_address *msg_s_addr, krb5_address *msg_r_addr);
-
-krb5_error_code
-krb5int_mk_chpw_req(krb5_context context, krb5_auth_context auth_context,
-                    krb5_data *ap_req, char *passwd, krb5_data *packet);
-
-krb5_error_code
-krb5int_rd_chpw_rep(krb5_context context, krb5_auth_context auth_context,
-                    krb5_data *packet, int *result_code,
-                    krb5_data *result_data);
-
-krb5_error_code KRB5_CALLCONV
-krb5_chpw_result_code_string(krb5_context context, int result_code,
-                             char **result_codestr);
-
-krb5_error_code
-krb5int_mk_setpw_req(krb5_context context, krb5_auth_context auth_context,
-                     krb5_data *ap_req, krb5_principal targetprinc,
-                     char *passwd, krb5_data *packet);
 
 #endif /* KRB5_INT_FUNC_PROTO__ */

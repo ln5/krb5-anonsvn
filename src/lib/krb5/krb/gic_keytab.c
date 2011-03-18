@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/krb/gic_keytab.c */
 /*
+ * lib/krb5/krb/gic_keytab.c
+ *
  * Copyright (C) 2002, 2003, 2008 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *

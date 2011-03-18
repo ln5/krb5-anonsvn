@@ -1,8 +1,13 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
+ *
+ * $Header$
  */
 
+#if !defined(lint) && !defined(__CODECENTER__)
+static char *rcsid = "$Header$";
+#endif
 #include        <kadm5/admin.h>
 #include        <stdlib.h>
 #include        "server_internal.h"

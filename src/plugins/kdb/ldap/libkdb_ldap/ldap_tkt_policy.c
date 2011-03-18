@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* plugins/kdb/ldap/libkdb_ldap/ldap_tkt_policy.c */
 /*
+ * lib/kdb/kdb_ldap/ldap_tkt_policy.c
+ *
  * Copyright (c) 2004-2005, Novell, Inc.
  * All rights reserved.
  *

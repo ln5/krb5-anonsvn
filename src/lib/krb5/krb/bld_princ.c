@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/krb/bld_princ.c - Build a principal from a list of strings */
 /*
+ * lib/krb5/krb/bld_princ.c
+ *
  * Copyright 1991 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,6 +23,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ * Build a principal from a list of strings
  */
 
 #include <stdarg.h>
@@ -151,22 +155,21 @@ krb5_build_principal_alloc_va(krb5_context context,
                               va_list ap)
 {
     krb5_error_code retval = 0;
-    krb5_principal p;
-    char *first;
 
-    p = malloc(sizeof(krb5_principal_data));
-    if (p == NULL)
-        return ENOMEM;
+    krb5_principal p = malloc(sizeof(krb5_principal_data));
+    if (!p) { retval = ENOMEM; }
 
-    first = va_arg(ap, char *);
-    retval = krb5int_build_principal_va(context, p, rlen, realm, first, ap);
-    if (retval) {
-        free(p);
-        return retval;
+    if (!retval) {
+        retval = krb5_build_principal_va(context, p, rlen, realm, ap);
     }
 
-    *princ = p;
-    return 0;
+    if (!retval) {
+        *princ = p;
+    } else {
+        free(p);
+    }
+
+    return retval;
 }
 
 krb5_error_code KRB5_CALLCONV_C

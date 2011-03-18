@@ -1,5 +1,6 @@
-/* ccapi/server/win/WorkQueue.h */
 /*
+ * $Header$
+ *
  * Copyright 2007 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

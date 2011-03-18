@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/crypto/openssl/enc_provider/camellia.c */
 /*
+ * lib/crypto/openssl/enc_provider/camellia.c
+ *
  * Copyright (C) 2003, 2007, 2008, 2009, 2010 by the Massachusetts Institute of
  * Technology.  All rights reserved.
  *
@@ -24,7 +25,11 @@
  * or implied warranty.
  */
 
-#include "crypto_int.h"
+#include "k5-int.h"
+#include "enc_provider.h"
+#include "rand2key.h"
+#include "aead.h"
+#include "hash_provider/hash_provider.h"
 #include <openssl/evp.h>
 #include <openssl/camellia.h>
 #include <openssl/modes.h>
@@ -371,6 +376,7 @@ const struct krb5_enc_provider krb5int_enc_camellia128 = {
     krb5int_camellia_encrypt,
     krb5int_camellia_decrypt,
     krb5int_camellia_cbc_mac,
+    krb5int_camellia_make_key,
     krb5int_camellia_init_state,
     krb5int_default_free_state
 };
@@ -381,6 +387,7 @@ const struct krb5_enc_provider krb5int_enc_camellia256 = {
     krb5int_camellia_encrypt,
     krb5int_camellia_decrypt,
     krb5int_camellia_cbc_mac,
+    krb5int_camellia_make_key,
     krb5int_camellia_init_state,
     krb5int_default_free_state
 };

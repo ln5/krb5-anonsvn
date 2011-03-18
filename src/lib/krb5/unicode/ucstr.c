@@ -1,4 +1,10 @@
 /*
+ * $OpenLDAP: pkg/ldap/libraries/liblunicode/ucstr.c,v 1.40 2008/03/04
+ * 06:24:05 hyc Exp $
+ */
+/*
+ * This work is part of OpenLDAP Software <http://www.openldap.org/>.
+ *
  * Copyright 1998-2008 The OpenLDAP Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -8,11 +14,6 @@
  * A copy of this license is available in file LICENSE in the top-level
  * directory of the distribution or, alternatively, at
  * <http://www.OpenLDAP.org/license.html>.
- */
-
-/*
- * This work is part of OpenLDAP Software <http://www.openldap.org/>.
- * $OpenLDAP: pkg/ldap/libraries/liblunicode/ucstr.c,v 1.40 2008/03/04 06:24:05 hyc Exp $
  */
 
 #include "k5-int.h"

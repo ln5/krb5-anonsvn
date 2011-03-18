@@ -1,5 +1,6 @@
-/* kim/lib/kim_library.c */
 /*
+ * $Header$
+ *
  * Copyright 2006-2008 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

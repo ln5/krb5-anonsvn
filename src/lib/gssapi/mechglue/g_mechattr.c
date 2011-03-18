@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/gssapi/mechglue/g_mechattr.c */
 /*
+ * src/lib/gssapi/mechglue/g_mechattr.c
+ *
  * Copyright (C) 2010 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -22,8 +23,10 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ * 
  */
-
 #include "mglueP.h"
 
 static int

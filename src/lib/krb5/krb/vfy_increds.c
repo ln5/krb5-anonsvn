@@ -2,24 +2,6 @@
 #include "k5-int.h"
 #include "int-proto.h"
 
-/* Return true if configuration demands that a keytab be present.  (By default
- * verification will be skipped if no keytab exists.) */
-static krb5_boolean
-nofail(krb5_context context, krb5_verify_init_creds_opt *options,
-       krb5_creds *creds)
-{
-    int val;
-
-    if (options &&
-        (options->flags & KRB5_VERIFY_INIT_CREDS_OPT_AP_REQ_NOFAIL))
-        return (options->ap_req_nofail != 0);
-    if (krb5int_libdefault_boolean(context, &creds->client->realm,
-                                   KRB5_CONF_VERIFY_AP_REQ_NOFAIL,
-                                   &val) == 0)
-        return (val != 0);
-    return FALSE;
-}
-
 static krb5_error_code
 copy_creds_except(krb5_context context, krb5_ccache incc,
                   krb5_ccache outcc, krb5_principal princ)
@@ -95,27 +77,14 @@ krb5_verify_init_creds(krb5_context context,
     authcon = NULL;
     ap_req.data = NULL;
 
-    if (keytab_arg) {
-        keytab = keytab_arg;
-    } else {
-        if ((ret = krb5_kt_default(context, &keytab)))
-            goto cleanup;
-    }
-
     if (server_arg) {
         ret = krb5_copy_principal(context, server_arg, &server);
         if (ret)
             goto cleanup;
     } else {
-        /* Use a principal name from the keytab. */
-        ret = k5_kt_get_principal(context, keytab, &server);
-        if (ret) {
-            /* There's no keytab, or it's empty, or we can't read it.
-             * Allow this unless configuration demands verification. */
-            if (!nofail(context, options, creds))
-                ret = 0;
+        if ((ret = krb5_sname_to_principal(context, NULL, NULL,
+                                           KRB5_NT_SRV_HST, &server)))
             goto cleanup;
-        }
     }
 
     /* first, check if the server is in the keytab.  If not, there's
@@ -123,6 +92,12 @@ krb5_verify_init_creds(krb5_context context,
        no way to know that a given error is caused by a missing
        keytab or key, and not by some other problem. */
 
+    if (keytab_arg) {
+        keytab = keytab_arg;
+    } else {
+        if ((ret = krb5_kt_default(context, &keytab)))
+            goto cleanup;
+    }
     if (krb5_is_referral_realm(&server->realm)) {
         krb5_free_data_contents(context, &server->realm);
         ret = krb5_get_default_realm(context, &server->realm.data);
@@ -133,8 +108,22 @@ krb5_verify_init_creds(krb5_context context,
     if ((ret = krb5_kt_get_entry(context, keytab, server, 0, 0, &kte))) {
         /* this means there is no keying material.  This is ok, as long as
            it is not prohibited by the configuration */
-        if (!nofail(context, options, creds))
-            ret = 0;
+
+        int nofail;
+
+        if (options &&
+            (options->flags & KRB5_VERIFY_INIT_CREDS_OPT_AP_REQ_NOFAIL)) {
+            if (options->ap_req_nofail)
+                goto cleanup;
+        } else if (krb5int_libdefault_boolean(context,
+                                              &creds->client->realm,
+                                              KRB5_CONF_VERIFY_AP_REQ_NOFAIL,
+                                              &nofail) == 0) {
+            if (nofail)
+                goto cleanup;
+        }
+
+        ret = 0;
         goto cleanup;
     }
 

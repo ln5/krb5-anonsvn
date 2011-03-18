@@ -1,5 +1,8 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* plugins/kdb/ldap/ldap_util/kdb5_ldap_services.c */
+/*
+ * kadmin/ldap_util/kdb5_ldap_services.c
+ */
+
 /* Copyright (c) 2004-2005, Novell, Inc.
  * All rights reserved.
  *

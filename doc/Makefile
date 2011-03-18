@@ -1,5 +1,5 @@
 SRCDIR=../src
-DVI=texi2dvi
+DVI=texi2dvi4a2ps	# texi2dvi
 DVIPS=dvips -o "$@"
 PSPDF=ps2pdf
 INFO=makeinfo
@@ -9,8 +9,7 @@ TAR=tar -chvf
 GZIP=gzip -9
 MANPS=./man2ps
 MANTXT=nroff -man 
-PERL=perl
-MANHTML=$(PERL) man2html
+MANHTML=./man2html
 
 ADMIN_INCLUDES=definitions.texinfo copyright.texinfo document-list.texinfo \
 	glossary.texinfo support-enc.texinfo salts.texinfo krb5conf.texinfo \

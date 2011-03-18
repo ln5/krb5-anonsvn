@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* kdc/fast_util.c */
 /*
+ * kdc/fast_util.c
+ *
  * Copyright (C) 2009 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -338,7 +339,6 @@ kdc_fast_response_handle_padata(struct kdc_request_state *state,
         pa[0].length = encrypted_reply->length;
         pa[0].contents = (unsigned char *)  encrypted_reply->data;
         pa_array[0] = &pa[0];
-        krb5_free_pa_data(kdc_context, rep->padata);
         rep->padata = pa_array;
         pa_array = NULL;
         free(encrypted_reply);
@@ -364,15 +364,14 @@ kdc_fast_response_handle_padata(struct kdc_request_state *state,
 /*
  * We assume the caller is responsible for passing us an in_padata
  * sufficient to include in a FAST error.  In the FAST case we will
- * set *fast_edata_out to the edata to be included in the error; in
- * the non-FAST case we will set it to NULL.
+ * throw away the e_data in the error (if any); in the non-FAST case
+ * we will not use the in_padata.
  */
 krb5_error_code
 kdc_fast_handle_error(krb5_context context,
                       struct kdc_request_state *state,
                       krb5_kdc_req *request,
-                      krb5_pa_data  **in_padata, krb5_error *err,
-                      krb5_data **fast_edata_out)
+                      krb5_pa_data  **in_padata, krb5_error *err)
 {
     krb5_error_code retval = 0;
     krb5_fast_response resp;
@@ -382,8 +381,8 @@ kdc_fast_handle_error(krb5_context context,
     krb5_pa_data *outer_pa[3], *cookie = NULL;
     krb5_pa_data **inner_pa = NULL;
     size_t size = 0;
+    krb5_data *encoded_e_data = NULL;
 
-    *fast_edata_out = NULL;
     memset(outer_pa, 0, sizeof(outer_pa));
     if (!state || !state->armor_key)
         return 0;
@@ -431,7 +430,15 @@ kdc_fast_handle_error(krb5_context context,
         pa[0].contents = (unsigned char *) encrypted_reply->data;
         outer_pa[0] = &pa[0];
     }
-    retval = encode_krb5_padata_sequence(outer_pa, fast_edata_out);
+    retval = encode_krb5_padata_sequence(outer_pa, &encoded_e_data);
+    if (retval == 0) {
+        /*process_as holds onto a pointer to the original e_data and frees it*/
+        err->e_data = *encoded_e_data;
+        free(encoded_e_data); /*contents belong to err*/
+        encoded_e_data = NULL;
+    }
+    if (encoded_e_data)
+        krb5_free_data(kdc_context, encoded_e_data);
     if (encrypted_reply)
         krb5_free_data(kdc_context, encrypted_reply);
     if (encoded_fx_error)

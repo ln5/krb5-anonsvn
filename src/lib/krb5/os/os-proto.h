@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/os/os-proto.h */
 /*
+ * lib/krb5/os/os-proto.h
+ *
  * Copyright 1990,1991,2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,19 +23,13 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- */
-
-/*
+ *
  *
  * LIBOS internal function prototypes.
  */
 
 #ifndef KRB5_LIBOS_INT_PROTO__
 #define KRB5_LIBOS_INT_PROTO__
-
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
 
 #include <krb5/locate_plugin.h>
 
@@ -104,8 +99,6 @@ krb5_error_code krb5int_get_fq_local_hostname(char *, size_t);
 
 /* The io vector is *not* const here, unlike writev()!  */
 int krb5int_net_writev (krb5_context, int, sg_buf *, int);
-
-int k5_getcurtime(struct timeval *tvp);
 
 #include "k5-thread.h"
 extern k5_mutex_t krb5int_us_time_mutex;

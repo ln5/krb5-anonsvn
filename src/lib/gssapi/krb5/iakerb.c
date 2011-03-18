@@ -21,6 +21,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 #include "k5-int.h"
 #include "gssapiP_krb5.h"
@@ -788,6 +789,9 @@ iakerb_make_exts(iakerb_ctx_id_t ctx, krb5_gss_ctx_ext_rec *exts)
         exts->iakerb.conv = &ctx->conv;
 }
 
+/*
+ *
+ */
 OM_uint32
 iakerb_gss_accept_sec_context(OM_uint32 *minor_status,
                               gss_ctx_id_t *context_handle,
@@ -911,6 +915,12 @@ iakerb_gss_init_sec_context(OM_uint32 *minor_status,
         }
     } else
         ctx = (iakerb_ctx_id_t)*context_handle;
+
+    if (!kg_validate_name(target_name)) {
+        *minor_status = G_VALIDATE_FAILED;
+        major_status = GSS_S_CALL_BAD_STRUCTURE | GSS_S_BAD_NAME;
+        goto cleanup;
+    }
 
     kname = (krb5_gss_name_t)target_name;
 

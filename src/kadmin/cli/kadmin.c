@@ -21,14 +21,14 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ * kadmin.c: base functions for a kadmin command line interface using
+ * the OVSecure library
  */
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-/* Base functions for a kadmin command line interface using the OVSecure
- * library */
 
 /* for "_" macro */
 #include "k5-platform.h"
@@ -38,7 +38,6 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
 #include <sys/types.h>
 #include <math.h>
 #include <unistd.h>
@@ -1608,12 +1607,7 @@ kadmin_parse_policy_args(int argc, char *argv[], kadm5_policy_ent_t policy,
             if (++i > argc - 2)
                 return -1;
             else {
-                date = get_date(argv[i]);
-                /* Allow bare numbers for compatibility with 1.8-1.9. */
-                if (date == (time_t)-1 && isdigit(*argv[i]))
-                    policy->pw_failcnt_interval = atoi(argv[i]);
-                else
-                    policy->pw_failcnt_interval = date - now;
+                policy->pw_failcnt_interval = atoi(argv[i]);
                 *mask |= KADM5_PW_FAILURE_COUNT_INTERVAL;
                 continue;
             }
@@ -1622,12 +1616,7 @@ kadmin_parse_policy_args(int argc, char *argv[], kadm5_policy_ent_t policy,
             if (++i > argc - 2)
                 return -1;
             else {
-                date = get_date(argv[i]);
-                /* Allow bare numbers for compatibility with 1.8-1.9. */
-                if (date == (time_t)-1 && isdigit(*argv[i]))
-                    policy->pw_lockout_duration = atoi(argv[i]);
-                else
-                    policy->pw_lockout_duration = date - now;
+                policy->pw_lockout_duration = atoi(argv[i]);
                 *mask |= KADM5_PW_LOCKOUT_DURATION;
                 continue;
             }
@@ -1745,10 +1734,10 @@ kadmin_getpol(int argc, char *argv[])
         printf("Reference count: %ld\n", policy.policy_refcnt);
         printf("Maximum password failures before lockout: %lu\n",
                (unsigned long)policy.pw_max_fail);
-        printf("Password failure count reset interval: %s\n",
-               strdur(policy.pw_failcnt_interval));
-        printf("Password lockout duration: %s\n",
-               strdur(policy.pw_lockout_duration));
+        printf("Password failure count reset interval: %ld\n",
+               (long)policy.pw_failcnt_interval);
+        printf("Password lockout duration: %ld\n",
+               (long)policy.pw_lockout_duration);
     } else {
         printf("\"%s\"\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%lu\t%ld\t%ld\n",
                policy.policy, policy.pw_max_life, policy.pw_min_life,

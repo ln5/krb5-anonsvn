@@ -25,7 +25,11 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include "crypto_int.h"
+#include "k5-int.h"
+#include "enc_provider.h"
+#include "hash_provider.h"
+#include "dk.h"
+#include "cksumtypes.h"
 
 const struct krb5_cksumtypes krb5int_cksumtypes_list[] = {
     { CKSUMTYPE_CRC32,

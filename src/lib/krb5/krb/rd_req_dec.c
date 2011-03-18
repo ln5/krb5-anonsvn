@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/krb/rd_req_dec.c */
 /*
+ * lib/krb5/krb/rd_req_dec.c
+ *
  * Copyright (c) 1994 CyberSAFE Corporation.
  * Copyright 1990,1991,2007,2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.

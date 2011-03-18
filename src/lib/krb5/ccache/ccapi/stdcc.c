@@ -1,8 +1,13 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/ccache/ccapi/stdcc.c - ccache API support functions */
 /*
- * Copyright 1998, 1999, 2006, 2008 by the Massachusetts Institute of
- * Technology.  All Rights Reserved.
+ * stdcc.c - additions to the Kerberos 5 library to support the memory
+ *       credentical cache API
+ *
+ * Written by Frank Dabek July 1998
+ * Updated by Jeffrey Altman June 2006
+ *
+ * Copyright 1998, 1999, 2006, 2008 by the Massachusetts Institute of Technology.
+ * All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
@@ -22,11 +27,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- */
-
-/*
- * Written by Frank Dabek July 1998
- * Updated by Jeffrey Altman June 2006
+ *
  */
 
 #if defined(_WIN32) || defined(USE_CCAPI)

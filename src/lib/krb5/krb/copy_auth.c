@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/krb/copy_auth.c */
 /*
+ * lib/krb5/krb/copy_auth.c
+ *
  * Copyright 1990 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,6 +23,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ * krb5_merge_authdata()
+ * krb5_copy_authdata()
  */
 /*
  * Copyright (c) 2006-2008, Novell, Inc.

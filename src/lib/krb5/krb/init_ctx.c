@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/krb/init_ctx.c */
 /*
+ * lib/krb5/krb/init_ctx.c
+ *
  * Copyright 1994,1999,2000, 2002, 2003, 2007, 2008, 2009  by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,7 +23,10 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ * krb5_init_contex()
  */
+
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  *
@@ -53,7 +57,10 @@
 #include "int-proto.h"
 #include <ctype.h>
 #include "brand.c"
+/* There has to be a better way for windows... */
+#if defined(unix) || TARGET_OS_MAC
 #include "../krb5_libinit.h"
+#endif
 
 /* The des-mdX entries are last for now, because it's easy to
    configure KDCs to issue TGTs with des-mdX keys and then not accept

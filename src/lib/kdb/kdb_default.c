@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/kdb/kdb_default.c */
 /*
+ * lib/kdb/kdb_helper.c
+ *
  * Copyright 1995, 2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,7 +23,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.

@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/krb/ser_ctx.c - Serialize krb5_context structure */
 /*
+ * lib/krb5/krb/ser_ctx.c
+ *
  * Copyright 1995, 2007, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,8 +23,13 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 
+/*
+ * ser_ctx.c    - Routines to deal with serializing the krb5_context and
+ *                krb5_os_context structures.
+ */
 #include "k5-int.h"
 #include "int-proto.h"
 

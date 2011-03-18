@@ -1,5 +1,6 @@
-/* kim/test/test_kim_preferences.h */
 /*
+ * $Header$
+ *
  * Copyright 2006 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

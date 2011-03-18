@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* kdc/do_tgs_req.c - KDC Routines to deal with TGS_REQ's */
 /*
+ * kdc/do_tgs_req.c
+ *
  * Copyright 1990,1991,2001,2007,2008,2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,6 +23,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ * KDC Routines to deal with TGS_REQ's
  */
 /*
  * Copyright (c) 2006-2008, Novell, Inc.
@@ -987,7 +991,7 @@ prepare_error_tgs (struct kdc_request_state *state,
 {
     krb5_error errpkt;
     krb5_error_code retval = 0;
-    krb5_data *scratch, *fast_edata = NULL;
+    krb5_data *scratch;
 
     errpkt.ctime = request->nonce;
     errpkt.cusec = 0;
@@ -1010,20 +1014,15 @@ prepare_error_tgs (struct kdc_request_state *state,
         return ENOMEM;
     }
     errpkt.e_data = *e_data;
-    if (state) {
-        retval = kdc_fast_handle_error(kdc_context, state, request, NULL,
-                                       &errpkt, &fast_edata);
-    }
+    if (state)
+        retval = kdc_fast_handle_error(kdc_context, state, request, NULL, &errpkt);
     if (retval) {
         free(scratch);
         free(errpkt.text.data);
         return retval;
     }
-    if (fast_edata)
-        errpkt.e_data = *fast_edata;
     retval = krb5_mk_error(kdc_context, &errpkt, scratch);
     free(errpkt.text.data);
-    krb5_free_data(kdc_context, fast_edata);
     if (retval)
         free(scratch);
     else

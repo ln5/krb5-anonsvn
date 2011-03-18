@@ -21,6 +21,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 #include "k5-int.h"
 #include "gssapiP_krb5.h"
@@ -218,7 +219,7 @@ kg_compose_deleg_cred(OM_uint32 *minor_status,
     cred->usage = GSS_C_INITIATE;
     cred->proxy_cred = !!(subject_creds->ticket_flags & TKT_FLG_FORWARDABLE);
 
-    cred->tgt_expire = subject_creds->times.endtime;
+    cred->tgt_expire = impersonator_cred->tgt_expire;
 
     code = kg_init_name(context, subject_creds->client, NULL, NULL, NULL, 0,
                         &cred->name);
@@ -258,6 +259,11 @@ kg_compose_deleg_cred(OM_uint32 *minor_status,
         *time_rec = cred->tgt_expire - now;
     }
 
+    if (!kg_save_cred_id((gss_cred_id_t)cred)) {
+        code = G_VALIDATE_FAILED;
+        goto cleanup;
+    }
+
     major_status = GSS_S_COMPLETE;
     *minor_status = 0;
     *output_cred = cred;
@@ -271,7 +277,7 @@ cleanup:
     if (GSS_ERROR(major_status) && cred != NULL) {
         k5_mutex_destroy(&cred->lock);
         krb5_cc_destroy(context, cred->ccache);
-        kg_release_name(context, &cred->name);
+        kg_release_name(context, 0, &cred->name);
         xfree(cred);
     }
 

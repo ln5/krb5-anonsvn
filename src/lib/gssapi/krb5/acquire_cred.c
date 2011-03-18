@@ -21,6 +21,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 /*
  * Copyright 1993 by OpenVision Technologies, Inc.
@@ -240,7 +241,7 @@ acquire_accept_cred(krb5_context context,
         }
 
         assert(cred->name == NULL);
-        code = kg_duplicate_name(context, desired_name, &cred->name);
+        code = kg_duplicate_name(context, desired_name, 0, &cred->name);
         if (code) {
             *minor_status = code;
             return GSS_S_FAILURE;
@@ -650,6 +651,11 @@ acquire_cred(OM_uint32 *minor_status,
             *time_rec = (cred->tgt_expire > now) ? (cred->tgt_expire - now) : 0;
     }
 
+    if (!kg_save_cred_id((gss_cred_id_t)cred)) {
+        ret = GSS_S_FAILURE;
+        goto error_out;
+    }
+
     *minor_status = 0;
     *output_cred_handle = (gss_cred_id_t) cred;
 
@@ -669,7 +675,7 @@ error_out:
             krb5_kt_close(context, cred->keytab);
 #endif /* LEAN_CLIENT */
         if (cred->name)
-            kg_release_name(context, &cred->name);
+            kg_release_name(context, 0, &cred->name);
         k5_mutex_destroy(&cred->lock);
         xfree(cred);
     }
@@ -740,6 +746,11 @@ krb5_gss_acquire_cred(minor_status, desired_name, time_req,
 {
     struct acquire_cred_args args;
 
+    if (desired_name && !kg_validate_name(desired_name)) {
+        *minor_status = G_VALIDATE_FAILED;
+        return GSS_S_FAILURE;
+    }
+
     memset(&args, 0, sizeof(args));
     args.desired_name = desired_name;
     args.time_req = time_req;
@@ -765,6 +776,11 @@ iakerb_gss_acquire_cred(minor_status, desired_name, time_req,
 {
     struct acquire_cred_args args;
 
+    if (desired_name && !kg_validate_name(desired_name)) {
+        *minor_status = G_VALIDATE_FAILED;
+        return GSS_S_FAILURE;
+    }
+
     memset(&args, 0, sizeof(args));
     args.desired_name = desired_name;
     args.time_req = time_req;
@@ -787,6 +803,11 @@ krb5_gss_acquire_cred_with_password(OM_uint32 *minor_status,
                                     OM_uint32 *time_rec)
 {
     struct acquire_cred_args args;
+
+    if (desired_name && !kg_validate_name(desired_name)) {
+        *minor_status = G_VALIDATE_FAILED;
+        return GSS_S_FAILURE;
+    }
 
     memset(&args, 0, sizeof(args));
     args.desired_name = desired_name;
@@ -811,6 +832,11 @@ iakerb_gss_acquire_cred_with_password(OM_uint32 *minor_status,
                                       OM_uint32 *time_rec)
 {
     struct acquire_cred_args args;
+
+    if (desired_name && !kg_validate_name(desired_name)) {
+        *minor_status = G_VALIDATE_FAILED;
+        return GSS_S_FAILURE;
+    }
 
     memset(&args, 0, sizeof(args));
     args.desired_name = desired_name;

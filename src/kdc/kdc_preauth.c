@@ -1,8 +1,9 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* kdc/kdc_preauth.c - Preauthentication routines for the KDC */
 /*
- * Copyright 1995, 2003, 2007, 2009 by the Massachusetts Institute of
- * Technology.  All Rights Reserved.
+ * kdc/kdc_preauth.c
+ *
+ * Copyright 1995, 2003, 2007, 2009 by the Massachusetts Institute of Technology.
+ * All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
@@ -22,7 +23,10 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ * Preauthentication routines for the KDC.
  */
+
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
  *
@@ -98,6 +102,15 @@ static const char *objdirs[] = { KRB5_PLUGIN_BUNDLE_DIR,
 #else
 static const char *objdirs[] = { LIBDIR "/krb5/plugins/preauth", NULL };
 #endif
+
+/* XXX This is ugly and should be in a header file somewhere */
+#ifndef KRB5INT_DES_TYPES_DEFINED
+#define KRB5INT_DES_TYPES_DEFINED
+typedef unsigned char des_cblock[8];    /* crypto-block size */
+#endif
+typedef des_cblock mit_des_cblock;
+extern void mit_des_fixup_key_parity (mit_des_cblock );
+extern int mit_des_is_weak_key (mit_des_cblock );
 
 typedef struct _krb5_preauth_systems {
     const char *name;

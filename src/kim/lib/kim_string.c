@@ -1,5 +1,6 @@
-/* kim/lib/kim_string.c */
 /*
+ * $Header$
+ *
  * Copyright 2006 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

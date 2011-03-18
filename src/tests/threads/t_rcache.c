@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* tests/threads/t_rcache.c */
 /*
+ * test/threads/t_rcache.c
+ *
  * Copyright (C) 2006 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -22,7 +23,11 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ *
  */
+
 
 #include <stdio.h>
 #include <com_err.h>

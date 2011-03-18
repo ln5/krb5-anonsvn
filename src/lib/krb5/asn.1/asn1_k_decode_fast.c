@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/asn.1/asn1_k_decode_fast.c */
 /*
+ * src/lib/krb5/asn.1/asn1_k_decode_fast.c
+ *
  * Copyright 1994, 2007, 2008, 2010 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

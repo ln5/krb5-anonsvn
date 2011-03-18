@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/asn.1/krb5_decode_macros.h */
 /*
+ * src/lib/krb5/asn.1/krb5_decode_macros.h
+ *
  * Copyright 1994, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *

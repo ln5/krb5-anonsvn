@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/kadm5/srv/server_acl.h */
 /*
+ * lib/kadm5/srv/server_acl.h
+ *
  * Copyright 1995-2004, 2007, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -22,6 +23,7 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
  */
 
 #ifndef SERVER_ACL_H__

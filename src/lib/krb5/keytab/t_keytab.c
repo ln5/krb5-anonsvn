@@ -1,6 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
-/* lib/krb5/keytab/t_keytab.c - Tests for keytab interface */
 /*
+ * lib/krb5/keytab/t_keytab.c
+ *
  * Copyright (C) 2007 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -22,7 +23,12 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
+ *
+ *
+ *
+ * A set of tests for the keytab interface
  */
+
 
 #include "k5-int.h"
 #include "autoconf.h"
