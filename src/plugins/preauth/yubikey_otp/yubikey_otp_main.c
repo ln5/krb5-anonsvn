@@ -268,9 +268,9 @@ process_preauth(krb5_context context, void *plugin_context,
 #if 0                           /* Free enc data?  */
     krb5_free_data_contents(context, &otp_req.enc_data.ciphertext);
 #endif
-    if (pa_array)
+    if (pa_array != NULL)
         free(pa_array);
-    if (pa)
+    if (pa != NULL)
         free(pa);
 
     return retval;
