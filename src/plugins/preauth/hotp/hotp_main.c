@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <syslog.h> /* for LOG_INFO */
+#include <curl/curl.h>
 
 #include "../lib/krb5/asn.1/asn1_encode.h"
 
@@ -331,6 +332,12 @@ server_init(krb5_context context,
         goto errout;
     }
 
+    ret = curl_global_init(CURL_GLOBAL_SSL);
+    if (ret != 0) {
+        SERVER_DEBUG("curl init failed\n");
+        retval = EFAULT;
+        goto errout;
+    }
     ret = 0; // ykclient_init(&ctx->yk_ctx);
     if (ret != 0 /*YKCLIENT_OK*/) {
         SERVER_DEBUG("ykclient_init failed\n");
