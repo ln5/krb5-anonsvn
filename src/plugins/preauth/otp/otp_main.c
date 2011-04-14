@@ -34,7 +34,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
-#include <syslog.h> /* for LOG_INFO */
+#include <assert.h>
+#include <syslog.h>             /* for LOG_INFO */
 #include <curl/curl.h>
 
 #include "../lib/krb5/asn.1/asn1_encode.h"
@@ -57,11 +58,17 @@
 #define OTP_FLAG_PIN_NOT_REQUIRED (1u<<4)
 #define OTP_FLAG_MUST_ENCRYPT_NONCE (1u<<5)
 
-#define YUBIKEY_URL_TEMPLATE "yubikey_url_template"
-#define YUBIKEY_CLIENT_ID "yubikey_client_id"
+#define OATH_URL_TEMPLATE "hotp_url_template"
+#define OATH_SUCCESS_RESPONSE "hotp_success_response"
 
-#define YUBIKEY_ID_LENGTH 12
-#define YUBIKEY_TOKEN_LENGTH 44
+/* A (class A) OATH token identifier as specified in
+   http://www.openauthentication.org/oath-id: MMTTUUUUUUUU.
+   M=manufacturer, T=token type, U=manufacturer unique id.  */
+#define OATH_ID_LENGTH 12
+
+/* We expect PA data attribute "OATH" to contain a string containg an
+   HOTP OTP (RFC 4226), i.e. between 6 and 8 decimal digits.  */
+#define OATH_OTP_LENGTH 8
 
 #ifdef DEBUG
 #define SERVER_DEBUG(body, ...) krb5_klog_syslog(LOG_DEBUG, "OTP PA: "body, \
@@ -72,19 +79,19 @@
 #define CLIENT_DEBUG(body, ...)
 #endif
 
-struct yubikey_otp_ctx {
+struct hotp_ctx {
     char *otp;
 };
 
-struct yubikey_server_ctx {
-    //ykclient_t *yk_ctx;
+struct oath_server_ctx {
     char *url_template;
+    char *success_response;
 };
 
 static int
 cli_init(krb5_context context, void **blob)
 {
-    struct yubikey_otp_ctx *ctx = NULL;
+    struct hotp_ctx *ctx = NULL;
 
     ctx = calloc(1, sizeof(*ctx));
     if (ctx == NULL) {
@@ -99,13 +106,14 @@ cli_init(krb5_context context, void **blob)
 static void
 cli_fini(krb5_context context, void *blob)
 {
-    struct yubikey_otp_ctx *ctx = blob;
+    struct hotp_ctx *ctx = blob;
 
     if (ctx == NULL) {
         return;
     }
 
-    free(ctx->otp);
+    if (ctx->otp != NULL)
+        free(ctx->otp);
     free(ctx);
 }
 
@@ -122,23 +130,23 @@ get_gic_opts(krb5_context context,
              const char *attr,
              const char *value)
 {
-    struct yubikey_otp_ctx *otp_ctx = plugin_context;
+    struct hotp_ctx *otp_ctx = plugin_context;
 
-    if (strcmp(attr, "OTP_yubikey") == 0) {
+    if (strcmp(attr, "OTP_HOTP") == 0) {
         if (otp_ctx->otp != NULL) {
             krb5_set_error_message(context, KRB5_PREAUTH_FAILED,
-                                   "OTP_yubikey can not be given twice\n");
+                                   "HOTP can not be given twice\n");
             return KRB5_PREAUTH_FAILED;
         }
 
         otp_ctx->otp = strdup(value);
         if (otp_ctx->otp == NULL) {
             krb5_set_error_message(context, KRB5_PREAUTH_FAILED,
-                                   "Could not dublicate OTP_yubikey value\n");
+                                   "Unable to copy HOTP\n");
             return ENOMEM;
         }
 
-        CLIENT_DEBUG("Got Yubikey OTP [%s]\n", otp_ctx->otp);
+        CLIENT_DEBUG("Got HOTP [%s]\n", otp_ctx->otp);
     }
 
     return 0;
@@ -160,7 +168,7 @@ process_preauth(krb5_context context, void *plugin_context,
     krb5_keyblock *armor_key = NULL;
     krb5_pa_data *pa = NULL;
     krb5_pa_data **pa_array = NULL;
-    struct yubikey_otp_ctx *otp_ctx = plugin_context;
+    struct hotp_ctx *otp_ctx = plugin_context;
     krb5_pa_otp_req otp_req;
     krb5_data *encoded_otp_req = NULL;
     krb5_pa_otp_challenge *otp_challenge = NULL;
@@ -184,7 +192,6 @@ process_preauth(krb5_context context, void *plugin_context,
                  padata->pa_type);
 
     if (padata->pa_type == KRB5_PADATA_OTP_CHALLENGE) {
-
         if (padata->length != 0) {
             encoded_otp_challenge.data = (char *) padata->contents;
             encoded_otp_challenge.length = padata->length;
@@ -205,15 +212,16 @@ process_preauth(krb5_context context, void *plugin_context,
 
         retval = krb5_c_encrypt_length(context, as_key->enctype,
                                        otp_challenge->nonce.length,
-                                       &otp_req.enc_data.ciphertext.length);
+                                       (size_t *) &otp_req.enc_data.ciphertext.length);
         if (retval != 0) {
             CLIENT_DEBUG("krb5_c_encrypt_length failed.\n");
             goto errout;
         }
 
-        otp_req.enc_data.ciphertext.data = (char *) malloc(otp_req.enc_data.ciphertext.length);
+        otp_req.enc_data.ciphertext.data =
+            (char *) malloc(otp_req.enc_data.ciphertext.length);
         if (otp_req.enc_data.ciphertext.data == NULL) {
-            CLIENT_DEBUG("malloc failed.\n");
+            CLIENT_DEBUG("Out of memory.\n");
             retval = ENOMEM;
             goto errout;
         }
@@ -238,7 +246,7 @@ process_preauth(krb5_context context, void *plugin_context,
         }
 
         if (otp_ctx->otp == NULL) {
-            CLIENT_DEBUG("Missing client context\n");
+            CLIENT_DEBUG("Missing client context.\n");
         } else {
             otp_req.otp_value.data = otp_ctx->otp;
             otp_req.otp_value.length = strlen(otp_ctx->otp);
@@ -246,6 +254,7 @@ process_preauth(krb5_context context, void *plugin_context,
 
         retval = encode_krb5_pa_otp_req(&otp_req, &encoded_otp_req);
         if (retval != 0) {
+            CLIENT_DEBUG("encode_krb5_pa_otp_req failed.\n");
             goto errout;
         }
 
@@ -280,32 +289,30 @@ check_token_id(krb5_context kcontext, const char *token,
 {
     krb5_tl_data *tl_data;
 
-    if (strlen(token) != YUBIKEY_TOKEN_LENGTH) {
+    if (strlen(token) != OATH_ID_LENGTH) {
         return EINVAL;
     }
 
+    /* Find OATH_ID in kdb.  */
     tl_data = client->tl_data;
     while (tl_data != NULL) {
-        if (tl_data->tl_data_type == KRB5_TL_YUBIKEY_ID) {
+        if (tl_data->tl_data_type == KRB5_TL_OTP_ID) {
             break;
         }
         tl_data = tl_data->tl_data_next;
     }
-
     if (tl_data == NULL) {
         return ENOENT;
     }
-
-    if (tl_data->tl_data_length != (YUBIKEY_ID_LENGTH + 1) ||
-        tl_data->tl_data_contents[YUBIKEY_ID_LENGTH] != '\0') {
+    if (tl_data->tl_data_length != (OATH_ID_LENGTH + 1) ||
+        tl_data->tl_data_contents[OATH_ID_LENGTH] != '\0') {
         return EINVAL;
     }
-
-    if (memcmp(token, tl_data->tl_data_contents, YUBIKEY_ID_LENGTH) == 0) {
-        return 0;
+    if (memcmp(token, tl_data->tl_data_contents, OATH_ID_LENGTH) == 0) {
+        return 0;               /* Success.  */
     }
 
-    SERVER_DEBUG("Cannot map token [%s] to principal", token);
+    SERVER_DEBUG("Cannot map token [%s] to principal [%s]", token, "FIXME");
 
     return ENOENT;
 }
@@ -318,13 +325,14 @@ server_get_flags(krb5_context kcontext, krb5_preauthtype pa_type)
 
 static krb5_error_code
 server_init(krb5_context context,
-            void **plugin_context,
+            void **pa_module_context,
             const char** realmnames)
 {
-    int ret;
-    struct yubikey_server_ctx *ctx = NULL;
+    struct oath_server_ctx *ctx = NULL;
     krb5_error_code retval = 0;
-    int client_id = 0;
+    int ret = 0;
+
+    assert(pa_module_context != NULL);
 
     ctx = calloc(1, sizeof(*ctx));
     if (ctx == NULL) {
@@ -338,42 +346,26 @@ server_init(krb5_context context,
         retval = EFAULT;
         goto errout;
     }
-    ret = 0; // ykclient_init(&ctx->yk_ctx);
-    if (ret != 0 /*YKCLIENT_OK*/) {
-        SERVER_DEBUG("ykclient_init failed\n");
-        retval = EFAULT;
-        goto errout;
-    }
 
-/* set URL template from krb5.conf */
+    /* Get URL template from KDC config.  */
     retval = profile_get_string(context->profile, KRB5_CONF_REALMS,
-                                context->default_realm, YUBIKEY_URL_TEMPLATE,
+                                context->default_realm, OATH_URL_TEMPLATE,
                                 NULL, &ctx->url_template);
     if (retval != 0) {
         SERVER_DEBUG("Failed to retrive URL template");
         goto errout;
     }
 
-    if (ctx->url_template != NULL) {
-        ; //ykclient_set_url_template(ctx->yk_ctx, ctx->url_template);
-    }
-/* set client id and key from krb5.conf */
-    retval = profile_get_integer(context->profile, KRB5_CONF_REALMS,
-                                context->default_realm, YUBIKEY_CLIENT_ID,
-                                0, &client_id);
+    /* Get success reponse string from KDC config.  */
+    retval = profile_get_string(context->profile, KRB5_CONF_REALMS,
+                                context->default_realm, OATH_SUCCESS_RESPONSE,
+                                NULL, &ctx->success_response);
     if (retval != 0) {
-        SERVER_DEBUG("Failed to retrive client id");
+        SERVER_DEBUG("Failed to retrive success response string");
         goto errout;
     }
 
-    if (client_id > 0) {
-        ; // ykclient_set_client(ctx->yk_ctx, client_id, 0, NULL);
-    } else {
-        SERVER_DEBUG("Missing Yubico client ID");
-        goto errout;
-    }
-
-    *plugin_context = ctx;
+    *pa_module_context = ctx;
 
     return 0;
 
@@ -384,13 +376,10 @@ server_init(krb5_context context,
 }
 
 static void
-server_fini(krb5_context context,
-            void *plugin_context)
+server_fini(krb5_context context, void *pa_module_context)
 {
-    struct yubikey_server_ctx *ctx = plugin_context;
+    struct oath_server_ctx *ctx = pa_module_context;
 
-    free(ctx->url_template);
-    ; //ykclient_done(&ctx->yk_ctx);
     free(ctx);
 }
 
@@ -412,24 +401,24 @@ server_get_edata(krb5_context context,
     retval = fast_kdc_get_armor_key(context, server_get_entry_data, request,
                                     client, &armor_key);
     if (retval != 0 || armor_key == NULL) {
-        SERVER_DEBUG("No armor key found failed\n");
+        SERVER_DEBUG("No armor key found\n");
         krb5_free_keyblock(context, armor_key);
         return EINVAL;
     }
 
     tl_data = client->tl_data;
     while (tl_data != NULL) {
-        if (tl_data->tl_data_type == KRB5_TL_YUBIKEY_ID) {
+        if (tl_data->tl_data_type == KRB5_TL_OTP_ID) {
             break;
         }
         tl_data = tl_data->tl_data_next;
     }
 
     if (tl_data == NULL) {
-        SERVER_DEBUG("No Yubikey ID found");
+        SERVER_DEBUG("OTP token id not found for principal\n");
         return ENOENT;
     }
-    SERVER_DEBUG("Yubikey ID found, sending OTP Challenge");
+    SERVER_DEBUG("OTP token id found, sending OTP challenge\n");
 
     memset(&otp_challenge, 0, sizeof(otp_challenge));
 /* "This nonce string MUST be as long as the longest key length of the
@@ -464,22 +453,36 @@ server_get_edata(krb5_context context,
     return 0;
 }
 
-static krb5_error_code
-server_verify_preauth(krb5_context context, struct _krb5_db_entry_new *client,
-                   krb5_data *req_pkt, krb5_kdc_req *request,
-                   krb5_enc_tkt_part *enc_tkt_reply, krb5_pa_data *data,
-                   preauth_get_entry_data_proc server_get_entry_data,
-                   void *pa_module_context, void **pa_request_context,
-                   krb5_data **e_data, krb5_authdata ***authz_data)
+static int
+hotp_request(const char *url_template, const char *otp,
+             const char *success_response)
 {
-    krb5_pa_otp_req *otp_req;
+    return -1;
+}
+
+static krb5_error_code
+server_verify_preauth(krb5_context context,
+                      struct _krb5_db_entry_new *client,
+                      krb5_data *req_pkt,
+                      krb5_kdc_req *request,
+                      krb5_enc_tkt_part *enc_tkt_reply,
+                      krb5_pa_data *data,
+                      preauth_get_entry_data_proc server_get_entry_data,
+                      void *pa_module_context,
+                      void **pa_request_context,
+                      krb5_data **e_data,
+                      krb5_authdata ***authz_data)
+{
+    krb5_pa_otp_req *otp_req = NULL;
     krb5_error_code retval = 0;
     krb5_data encoded_otp_req;
-    struct yubikey_server_ctx *ctx = pa_module_context;
-    char *otp;
+    char *otp = NULL;
     int ret;
     krb5_keyblock *armor_key = NULL;
     krb5_data decrypted_data;
+    struct oath_server_ctx *oath_ctx = pa_module_context;
+
+    assert(oath_ctx != NULL);
 
     encoded_otp_req.length = data->length;
     encoded_otp_req.data = (char *) data->contents;
@@ -522,8 +525,8 @@ server_verify_preauth(krb5_context context, struct _krb5_db_entry_new *client,
 
     krb5_free_data_contents(context, &decrypted_data);
 
-    SERVER_DEBUG("Yubikey (%.*s)", otp_req->otp_value.length,
-                                   otp_req->otp_value.data);
+    SERVER_DEBUG("HOTP (%.*s)", otp_req->otp_value.length,
+                 otp_req->otp_value.data);
     otp = strndup(otp_req->otp_value.data, otp_req->otp_value.length);
     if (otp == NULL) {
         SERVER_DEBUG("strndup failed");
@@ -539,13 +542,13 @@ server_verify_preauth(krb5_context context, struct _krb5_db_entry_new *client,
         return ret;
     }
 
-    ret = 0; // ykclient_request (ctx->yk_ctx, otp);
+    ret = hotp_request (oath_ctx->url_template, otp,
+                        oath_ctx->success_response);
     free(otp);
 
-    SERVER_DEBUG("Yubikey auth result: [%s]", ykclient_strerror(ret));
+    SERVER_DEBUG("HOTP auth result: %d", ret);
 
-
-    if (ret != 0 /*YKCLIENT_OK*/) {
+    if (ret) {
         *pa_request_context = NULL;
         krb5_free_keyblock(context, armor_key);
         return KRB5KDC_ERR_PREAUTH_FAILED;
@@ -599,7 +602,7 @@ krb5_preauthtype supported_pa_types[] = {
     KRB5_PADATA_OTP_CHALLENGE, KRB5_PADATA_OTP_REQUEST, 0};
 
 struct krb5plugin_preauth_server_ftable_v1 preauthentication_server_1 = {
-    "Yubikey OPT",
+    "OTP",
     &supported_pa_types[0],
     server_init,
     server_fini,
@@ -611,15 +614,15 @@ struct krb5plugin_preauth_server_ftable_v1 preauthentication_server_1 = {
 };
 
 struct krb5plugin_preauth_client_ftable_v1 preauthentication_client_1 = {
-    "Yubikey OTP",                /* name */
+    "OTP",                      /* name */
     &supported_pa_types[0],
-    NULL,                    /* enctype_list */
-    cli_init,                    /* plugin init function */
-    cli_fini,                    /* plugin fini function */
+    NULL,                       /* enctype_list */
+    cli_init,
+    cli_fini,
     preauth_flags,
-    NULL,                    /* request init function */
-    NULL,                    /* request fini function */
+    NULL,                       /* request init function */
+    NULL,                       /* request fini function */
     process_preauth,
-    NULL,                    /* try_again function */
-    get_gic_opts             /* get init creds opt function */
+    NULL,                       /* try_again function */
+    get_gic_opts                /* get init creds opt function */
 };

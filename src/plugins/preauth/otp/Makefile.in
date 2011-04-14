@@ -1,4 +1,4 @@
-mydir=plugins/preauth/hotp
+mydir=plugins/preauth/otp
 BUILDTOP=$(REL)..$(S)..$(S)..
 KRB5_RUN_ENV = @KRB5_RUN_ENV@
 KRB5_CONFIG_SETUP = KRB5_CONFIG=$(top_srcdir)/config-files/krb5.conf ; export KRB5_CONFIG ;
@@ -9,23 +9,23 @@ DEFS=@DEFS@
 
 LOCALINCLUDES = -I../../../include/krb5 -I.
 
-LIBBASE=hotp
+LIBBASE=otp
 LIBMAJOR=0
 LIBMINOR=0
 SO_EXT=.so
-RELDIR=../plugins/preauth/hotp
+RELDIR=../plugins/preauth/otp
 # Depends on libk5crypto and libkrb5
 SHLIB_EXPDEPS = \
 	$(TOPLIBD)/libk5crypto$(SHLIBEXT) \
 	$(TOPLIBD)/libkrb5$(SHLIBEXT)
-SHLIB_EXPLIBS= -lkrb5 -lkadm5srv_mit -lcom_err -lk5crypto $(SUPPORT_LIB) $(LIBS)
+SHLIB_EXPLIBS= -lkrb5 -lkadm5srv_mit -lcom_err -lk5crypto -lykclient -lcurl $(SUPPORT_LIB) $(LIBS)
 
 SHLIB_DIRS=-L$(TOPLIBD)
 SHLIB_RDIRS=$(KRB5_LIBDIR)
 STOBJLISTS=OBJS.ST
-STLIBOBJS=hotp_main.o
+STLIBOBJS=otp_main.o
 
-SRCS= $(srcdir)/hotp_main.c
+SRCS= $(srcdir)/otp_main.c
 
 all-unix:: all-liblinks
 install-unix:: install-libs
