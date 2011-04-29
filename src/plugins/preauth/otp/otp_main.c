@@ -58,17 +58,19 @@
 #define OTP_FLAG_PIN_NOT_REQUIRED (1u<<4)
 #define OTP_FLAG_MUST_ENCRYPT_NONCE (1u<<5)
 
-#define OATH_URL_TEMPLATE "hotp_url_template"
-#define OATH_SUCCESS_RESPONSE "hotp_success_response"
+#define OATH_URL_TEMPLATE "otp_url_template"
+#define OATH_SUCCESS_RESPONSE "otp_success_response"
 
+#ifdef OATH_SPECIFIC
 /* A (class A) OATH token identifier as specified in
    http://www.openauthentication.org/oath-id: MMTTUUUUUUUU.
    M=manufacturer, T=token type, U=manufacturer unique id.  */
 #define OATH_ID_LENGTH 12
 
-/* We expect PA data attribute "OATH" to contain a string containg an
-   HOTP OTP (RFC 4226), i.e. between 6 and 8 decimal digits.  */
+/* We expect PA data attribute "OTP_OATH" to contain a string containg
+   an HOTP OTP (RFC 4226), i.e. between 6 and 8 decimal digits.  */
 #define OATH_OTP_LENGTH 8
+#endif  /* OATH_SPECIFIC */
 
 #ifdef DEBUG
 #define SERVER_DEBUG(body, ...) krb5_klog_syslog(LOG_DEBUG, "OTP PA: "body, \
@@ -79,19 +81,25 @@
 #define CLIENT_DEBUG(body, ...)
 #endif
 
-struct hotp_ctx {
+struct otp_client_ctx {
     char *otp;
 };
 
-struct oath_server_ctx {
+struct otp_server_ctx {
+    CURL *curlh;
     char *url_template;
     char *success_response;
+    char *token_id;
 };
+
+/* Client.  */
+static krb5_preauthtype cli_supported_pa_types[] =
+    {KRB5_PADATA_OTP_CHALLENGE, 0};
 
 static int
 cli_init(krb5_context context, void **blob)
 {
-    struct hotp_ctx *ctx = NULL;
+    struct otp_client_ctx *ctx = NULL;
 
     ctx = calloc(1, sizeof(*ctx));
     if (ctx == NULL) {
@@ -106,7 +114,7 @@ cli_init(krb5_context context, void **blob)
 static void
 cli_fini(krb5_context context, void *blob)
 {
-    struct hotp_ctx *ctx = blob;
+    struct otp_client_ctx *ctx = blob;
 
     if (ctx == NULL) {
         return;
@@ -130,23 +138,23 @@ get_gic_opts(krb5_context context,
              const char *attr,
              const char *value)
 {
-    struct hotp_ctx *otp_ctx = plugin_context;
+    struct otp_client_ctx *otp_ctx = plugin_context;
 
-    if (strcmp(attr, "OTP_HOTP") == 0) {
+    if (strcmp(attr, "OTP") == 0) {
         if (otp_ctx->otp != NULL) {
             krb5_set_error_message(context, KRB5_PREAUTH_FAILED,
-                                   "HOTP can not be given twice\n");
+                                   "OTP can not be given twice\n");
             return KRB5_PREAUTH_FAILED;
         }
 
         otp_ctx->otp = strdup(value);
         if (otp_ctx->otp == NULL) {
             krb5_set_error_message(context, KRB5_PREAUTH_FAILED,
-                                   "Unable to copy HOTP\n");
+                                   "Unable to copy OTP\n");
             return ENOMEM;
         }
 
-        CLIENT_DEBUG("Got HOTP [%s]\n", otp_ctx->otp);
+        CLIENT_DEBUG("Got OTP [%s]\n", otp_ctx->otp);
     }
 
     return 0;
@@ -168,11 +176,13 @@ process_preauth(krb5_context context, void *plugin_context,
     krb5_keyblock *armor_key = NULL;
     krb5_pa_data *pa = NULL;
     krb5_pa_data **pa_array = NULL;
-    struct hotp_ctx *otp_ctx = plugin_context;
+    struct otp_client_ctx *otp_ctx = plugin_context;
     krb5_pa_otp_req otp_req;
     krb5_data *encoded_otp_req = NULL;
     krb5_pa_otp_challenge *otp_challenge = NULL;
     krb5_data encoded_otp_challenge;
+
+    CLIENT_DEBUG("%s: enter\n", __func__);
 
     retval = fast_get_armor_key(context, get_data_proc, rock, &armor_key);
     if (retval != 0 || armor_key == NULL) {
@@ -282,18 +292,26 @@ process_preauth(krb5_context context, void *plugin_context,
     return retval;
 }
 
+
 /* Server.  */
+#if 0                           /* Done in server_get_edata().  */
 static krb5_error_code
-check_token_id(krb5_context kcontext, const char *token,
-               struct _krb5_db_entry_new *client)
+get_token_id(krb5_context kcontext,
+             struct _krb5_db_entry_new *client,
+             struct otp_server_ctx *otp_ctx,
+             unsigned const char *token)
 {
     krb5_tl_data *tl_data;
 
+    SERVER_DEBUG("%s: enter", __func__);
+
+#ifdef OATH_SPECIFIC
     if (strlen(token) != OATH_ID_LENGTH) {
         return EINVAL;
     }
+#endif  /* OATH_SPECIFIC */
 
-    /* Find OATH_ID in kdb.  */
+    /* Find token id in kdb.  */
     tl_data = client->tl_data;
     while (tl_data != NULL) {
         if (tl_data->tl_data_type == KRB5_TL_OTP_ID) {
@@ -304,18 +322,29 @@ check_token_id(krb5_context kcontext, const char *token,
     if (tl_data == NULL) {
         return ENOENT;
     }
+
+#ifdef OATH_SPECIFIC
     if (tl_data->tl_data_length != (OATH_ID_LENGTH + 1) ||
         tl_data->tl_data_contents[OATH_ID_LENGTH] != '\0') {
         return EINVAL;
     }
     if (memcmp(token, tl_data->tl_data_contents, OATH_ID_LENGTH) == 0) {
+        SERVER_DEBUG("Token mapped: [%s]", token);
         return 0;               /* Success.  */
     }
+#else  /* !OATH_SPECIFIC */
+    if (token == NULL
+        || strcmp((const char *) token,
+                  (const char *) tl_data->tl_data_contents) == 0) {
+        SERVER_DEBUG("Token mapped: [%s]", token);
+        return 0;               /* Success.  */
+    }
+#endif  /* !OATH_SPECIFIC */
 
     SERVER_DEBUG("Cannot map token [%s] to principal [%s]", token, "FIXME");
-
     return ENOENT;
 }
+#endif
 
 static int
 server_get_flags(krb5_context kcontext, krb5_preauthtype pa_type)
@@ -328,9 +357,9 @@ server_init(krb5_context context,
             void **pa_module_context,
             const char** realmnames)
 {
-    struct oath_server_ctx *ctx = NULL;
+    struct otp_server_ctx *ctx = NULL;
     krb5_error_code retval = 0;
-    int ret = 0;
+    CURLcode cret = 0;
 
     assert(pa_module_context != NULL);
 
@@ -340,9 +369,15 @@ server_init(krb5_context context,
         goto errout;
     }
 
-    ret = curl_global_init(CURL_GLOBAL_SSL);
-    if (ret != 0) {
-        SERVER_DEBUG("curl init failed\n");
+    cret = curl_global_init(CURL_GLOBAL_SSL);
+    if (cret != 0) {
+        SERVER_DEBUG("curl global init failed");
+        retval = EFAULT;
+        goto errout;
+    }
+    ctx->curlh = curl_easy_init();
+    if (ctx->curlh == NULL) {
+        SERVER_DEBUG("curl init failed");
         retval = EFAULT;
         goto errout;
     }
@@ -378,8 +413,14 @@ server_init(krb5_context context,
 static void
 server_fini(krb5_context context, void *pa_module_context)
 {
-    struct oath_server_ctx *ctx = pa_module_context;
+    struct otp_server_ctx *ctx = pa_module_context;
 
+    curl_easy_cleanup(ctx->curlh);
+    curl_global_cleanup();
+
+    assert(ctx != NULL);
+    if (ctx->token_id != NULL)
+        free(ctx->token_id);
     free(ctx);
 }
 
@@ -397,28 +438,43 @@ server_get_edata(krb5_context context,
     krb5_pa_otp_challenge otp_challenge;
     krb5_data *encoded_otp_challenge = NULL;
     krb5_tl_data *tl_data;
+    struct otp_server_ctx *otp_ctx = pa_module_context;
+
+    SERVER_DEBUG("%s: enter", __func__);
+    assert(otp_ctx != NULL);
 
     retval = fast_kdc_get_armor_key(context, server_get_entry_data, request,
                                     client, &armor_key);
     if (retval != 0 || armor_key == NULL) {
-        SERVER_DEBUG("No armor key found\n");
+        SERVER_DEBUG("No armor key found");
         krb5_free_keyblock(context, armor_key);
         return EINVAL;
     }
 
+    /* Find (the right) token id.  Store a copy of it in otp_ctx.  */
     tl_data = client->tl_data;
     while (tl_data != NULL) {
         if (tl_data->tl_data_type == KRB5_TL_OTP_ID) {
+            /* TODO: Match with value of padata "OTP_ID".  */
             break;
         }
         tl_data = tl_data->tl_data_next;
     }
 
     if (tl_data == NULL) {
-        SERVER_DEBUG("OTP token id not found for principal\n");
+        SERVER_DEBUG("OTP token id not found for principal");
         return ENOENT;
     }
-    SERVER_DEBUG("OTP token id found, sending OTP challenge\n");
+
+    otp_ctx->token_id = strndup((const char *) tl_data->tl_data_contents,
+                                tl_data->tl_data_length);
+    if (otp_ctx->token_id == NULL) {
+        SERVER_DEBUG("Unable to copy token id.");
+        return ENOMEM;
+    }
+
+    SERVER_DEBUG("OTP token id [%s] found, sending OTP challenge",
+                 otp_ctx->token_id);
 
     memset(&otp_challenge, 0, sizeof(otp_challenge));
 /* "This nonce string MUST be as long as the longest key length of the
@@ -429,12 +485,12 @@ server_get_edata(krb5_context context,
     otp_challenge.nonce.length = 32;
     otp_challenge.nonce.data = (char *) malloc(otp_challenge.nonce.length + 1);
     if (otp_challenge.nonce.data == NULL) {
-        SERVER_DEBUG("malloc failed\n");
+        SERVER_DEBUG("malloc failed");
         return ENOMEM;
     }
     retval = krb5_c_random_make_octets(context, &otp_challenge.nonce);
     if(retval != 0) {
-        SERVER_DEBUG("krb5_c_random_make_octets failed\n");
+        SERVER_DEBUG("krb5_c_random_make_octets failed");
         return retval;
     }
 
@@ -442,7 +498,7 @@ server_get_edata(krb5_context context,
 
     retval = encode_krb5_pa_otp_challenge(&otp_challenge, &encoded_otp_challenge);
     if (retval != 0) {
-        SERVER_DEBUG("encode_krb5_pa_otp_challenge failed\n");
+        SERVER_DEBUG("encode_krb5_pa_otp_challenge failed");
         return retval;
     }
 
@@ -453,10 +509,109 @@ server_get_edata(krb5_context context,
     return 0;
 }
 
-static int
-hotp_request(const char *url_template, const char *otp,
-             const char *success_response)
+#if !defined DEBUG
+static size_t
+curl_wfunc(void *ptr, size_t size, size_t nmemb, void *stream)
 {
+    return size * nmemb;
+}
+#endif  /* !DEBUG */
+
+static int
+verify_otp(const struct otp_server_ctx *ctx, const char *pw)
+{
+    CURLcode cret = 0;
+    char *url = NULL;
+    long respcode = 0;
+#ifdef DEBUG
+    char curl_errbuf[CURL_ERROR_SIZE];
+#endif
+
+    SERVER_DEBUG("%s: "
+                 "url_template=[%s] success_response=[%s]"
+                 "token id=[%s] pw=[%s]",
+                 __func__,
+                 ctx->url_template, ctx->success_response,
+                 ctx->token_id, pw);
+
+    assert(ctx != NULL);
+    assert(pw != NULL);
+
+    if (ctx->url_template == NULL) {
+        SERVER_DEBUG("Missing otp_url_template in krb5.conf.");
+        return -1;
+    }
+    if (strstr(ctx->url_template, "%s") == NULL) {
+        url = ctx->url_template;
+    }
+    else {
+        snprintf(url, sizeof(url), ctx->url_template, ctx->token_id, pw);
+    }
+
+    cret = curl_easy_setopt(ctx->curlh, CURLOPT_URL, url);
+    if (cret != CURLE_OK) {
+        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        return -1;
+    }
+    cret = curl_easy_setopt(ctx->curlh, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+    if (cret != CURLE_OK) {
+        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        return -1;
+    }
+    cret = curl_easy_setopt(ctx->curlh, CURLOPT_USERNAME, ctx->token_id);
+    if (cret != CURLE_OK) {
+        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        return -1;
+    }
+    cret = curl_easy_setopt(ctx->curlh, CURLOPT_PASSWORD, pw);
+    if (cret != CURLE_OK) {
+        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        return -1;
+    }
+    cret = curl_easy_setopt(ctx->curlh, CURLOPT_TIMEOUT_MS, 3000);
+    if (cret != CURLE_OK) {
+        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        return -1;
+    }
+    cret = curl_easy_setopt(ctx->curlh, CURLOPT_SSLVERSION,
+                            CURL_SSLVERSION_TLSv1);
+    if (cret != CURLE_OK) {
+        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        return -1;
+    }
+
+#if !defined DEBUG
+    cret = curl_easy_setopt(ctx->curlh, CURLOPT_WRITEFUNCTION, curl_wfunc);
+    if (cret != CURLE_OK) {
+        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        return -1;
+    }
+#endif  /* !DEBUG */
+
+#ifdef DEBUG
+    curl_easy_setopt(ctx->curlh, CURLOPT_ERRORBUFFER, curl_errbuf);
+#endif
+    cret = curl_easy_perform(ctx->curlh);
+#ifdef DEBUG
+    curl_easy_setopt(ctx->curlh, CURLOPT_ERRORBUFFER, NULL);
+#endif
+    if (cret != CURLE_OK) {
+        SERVER_DEBUG("%s:%d: curl error %d (%s)", __func__, __LINE__, cret,
+                     curl_errbuf);
+        return -1;
+    }
+
+    cret = curl_easy_getinfo(ctx->curlh, CURLINFO_RESPONSE_CODE, &respcode);
+    if (cret != CURLE_OK) {
+        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        return -1;
+    }
+    if (respcode == 200) {
+        SERVER_DEBUG("Successful OTP verification for %s", ctx->token_id);
+        return 0;
+    }
+
+    SERVER_DEBUG("%s: OTP authn response: %ld", __func__, respcode);
     return -1;
 }
 
@@ -480,9 +635,9 @@ server_verify_preauth(krb5_context context,
     int ret;
     krb5_keyblock *armor_key = NULL;
     krb5_data decrypted_data;
-    struct oath_server_ctx *oath_ctx = pa_module_context;
+    struct otp_server_ctx *otp_ctx = pa_module_context;
 
-    assert(oath_ctx != NULL);
+    assert(otp_ctx != NULL);
 
     encoded_otp_req.length = data->length;
     encoded_otp_req.data = (char *) data->contents;
@@ -492,9 +647,8 @@ server_verify_preauth(krb5_context context,
         return KRB5KDC_ERR_PREAUTH_FAILED;
     }
 
-
-/* FIXME: So far I only check if some encryted data is present. To verify it
- * the nonce must be put into a PA-FX-COOKIE and I don't know how to do it. */
+    /* FIXME: So far I only check if some encryted data is present. To verify it
+     * the nonce must be put into a PA-FX-COOKIE and I don't know how to do it. */
     if (otp_req->enc_data.ciphertext.data == NULL) {
         SERVER_DEBUG("Missing encrypted data.");
         return KRB5KDC_ERR_PREAUTH_FAILED;
@@ -522,10 +676,9 @@ server_verify_preauth(krb5_context context,
         krb5_free_keyblock(context, armor_key);
         return retval;
     }
-
     krb5_free_data_contents(context, &decrypted_data);
 
-    SERVER_DEBUG("HOTP (%.*s)", otp_req->otp_value.length,
+    SERVER_DEBUG("OTP (%.*s)", otp_req->otp_value.length,
                  otp_req->otp_value.data);
     otp = strndup(otp_req->otp_value.data, otp_req->otp_value.length);
     if (otp == NULL) {
@@ -534,19 +687,10 @@ server_verify_preauth(krb5_context context,
         return ENOMEM;
     }
 
-    ret = check_token_id(context, otp, client);
-    if (ret != 0) {
-        SERVER_DEBUG("check_token_id failed");
-        free(otp);
-        krb5_free_keyblock(context, armor_key);
-        return ret;
-    }
-
-    ret = hotp_request (oath_ctx->url_template, otp,
-                        oath_ctx->success_response);
+    ret = verify_otp(otp_ctx, otp);
     free(otp);
 
-    SERVER_DEBUG("HOTP auth result: %d", ret);
+    SERVER_DEBUG("OTP auth result: %d", ret);
 
     if (ret) {
         *pa_request_context = NULL;
@@ -579,6 +723,7 @@ server_return(krb5_context kcontext,
     krb5_keyblock *reply_key = NULL;
     krb5_error_code retval;
 
+    SERVER_DEBUG("%s: enter", __func__);
     if (pa_request_context == NULL || *pa_request_context == NULL) {
         SERVER_DEBUG("Not handled by me.");
         return 0;
@@ -591,19 +736,19 @@ server_return(krb5_context kcontext,
     retval = krb5_copy_keyblock_contents(kcontext, reply_key, encrypting_key);
     krb5_free_keyblock(kcontext, reply_key);
     if (retval != 0) {
-        SERVER_DEBUG("Copying reply key failed.\n");
+        SERVER_DEBUG("Copying reply key failed.");
         return retval;
     }
 
     return 0;
 }
 
-krb5_preauthtype supported_pa_types[] = {
-    KRB5_PADATA_OTP_CHALLENGE, KRB5_PADATA_OTP_REQUEST, 0};
+static krb5_preauthtype server_supported_pa_types[] =
+    {KRB5_PADATA_OTP_REQUEST, 0};
 
 struct krb5plugin_preauth_server_ftable_v1 preauthentication_server_1 = {
     "OTP",
-    &supported_pa_types[0],
+    server_supported_pa_types,
     server_init,
     server_fini,
     server_get_flags,
@@ -615,7 +760,7 @@ struct krb5plugin_preauth_server_ftable_v1 preauthentication_server_1 = {
 
 struct krb5plugin_preauth_client_ftable_v1 preauthentication_client_1 = {
     "OTP",                      /* name */
-    &supported_pa_types[0],
+    cli_supported_pa_types,
     NULL,                       /* enctype_list */
     cli_init,
     cli_fini,
