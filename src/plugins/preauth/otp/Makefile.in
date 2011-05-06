@@ -23,9 +23,15 @@ SHLIB_EXPLIBS= -lkrb5 -lkadm5srv_mit -lcom_err -lk5crypto -lykclient -lcurl $(SU
 SHLIB_DIRS=-L$(TOPLIBD)
 SHLIB_RDIRS=$(KRB5_LIBDIR)
 STOBJLISTS=OBJS.ST
-STLIBOBJS=otp_main.o
+STLIBOBJS= \
+	otp_main.o \
+	m_basicauth.o \
+	m_ykclient.o
 
-SRCS= $(srcdir)/otp_main.c
+SRCS= \
+	$(srcdir)/otp_main.c \
+	$(srcdir)/m_basicauth.c \
+	$(srcdir)/m_ykclient.c
 
 all-unix:: all-liblinks
 install-unix:: install-libs

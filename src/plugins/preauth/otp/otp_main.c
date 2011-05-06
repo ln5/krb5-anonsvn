@@ -30,13 +30,64 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+  A successful OTP authentication follows this process on the KDC.
+
+  (1) The kdb is searched for an OTP token identity (KRB5_TL_OTP_ID),
+      matching what might be found in preauth attribute "OTP_TOKENID".
+
+  (2) An authn method, i.e. a function, is picked from the result of
+      (1).
+
+  (3) The kdb is searched for an OTP method data blob
+      (KRB5_TL_OTP_BLOB) matching the token id used.
+
+  (4) The authn method from (2) is invoked with the binary blob from
+      (3).
+
+  (5) The result from (4) is returned.
+
+
+  Two new [tl-data] are defined for the krbExtraData [field] in the
+  Kerberos database, KRB5_TL_OTP_ID and KRB5_TL_OTP_BLOB.
+
+  KRB5_TL_OTP_ID is a string with two tokens separated by a colon.
+
+    <otp-token-id>:<method-name>
+
+    otp-token-id identifies a unique token on the form of a class A
+    OATH token identifier as specified in
+    http://www.openauthentication.org/oath-id: MMTTUUUUUUUU.
+    M=manufacturer, T=token type, U=manufacturer unique id
+    method-name.
+
+    method-name identifies the method to use for authentication,
+    f.ex. "basicauth", "ykclient" or "nativehotp".  The method name
+    maps to a function in the OTP plugin or possibly in a second-level
+    plugin.  A method may use the prefix "otp_<method-name>_" for
+    profile names in krb5.conf.
+
+  KRB5_TL_OTP_BLOB is a binary blob tagged with a token id.
+
+    <otp-token-id>:<binary-blob>
+
+    otp-token-id is the same token identifier as found in a
+    KRB5_TL_OTP_ID.
+
+    binary-blob is a binary blob passed to the authentication method
+    chosen based on the KRB5_TL_OTP_ID.
+
+  A token id may be passed to the KDC using the pre-authentication
+  attribute "OTP_TOKENID".  If no OTP_TOKENID is provided, the first
+  KRB5_TL_OTP_ID found in the kdb is used.
+ */
+
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
 #include <syslog.h>             /* for LOG_INFO */
-#include <curl/curl.h>
 
 #include "../lib/krb5/asn.1/asn1_encode.h"
 
@@ -58,19 +109,10 @@
 #define OTP_FLAG_PIN_NOT_REQUIRED (1u<<4)
 #define OTP_FLAG_MUST_ENCRYPT_NONCE (1u<<5)
 
-#define OATH_URL_TEMPLATE "otp_url_template"
-#define OATH_SUCCESS_RESPONSE "otp_success_response"
-
-#ifdef OATH_SPECIFIC
 /* A (class A) OATH token identifier as specified in
    http://www.openauthentication.org/oath-id: MMTTUUUUUUUU.
    M=manufacturer, T=token type, U=manufacturer unique id.  */
-#define OATH_ID_LENGTH 12
-
-/* We expect PA data attribute "OTP_OATH" to contain a string containg
-   an HOTP OTP (RFC 4226), i.e. between 6 and 8 decimal digits.  */
-#define OATH_OTP_LENGTH 8
-#endif  /* OATH_SPECIFIC */
+#define TOKEN_ID_LENGTH 12
 
 #ifdef DEBUG
 #define SERVER_DEBUG(body, ...) krb5_klog_syslog(LOG_DEBUG, "OTP PA: "body, \
@@ -81,15 +123,18 @@
 #define CLIENT_DEBUG(body, ...)
 #endif
 
-struct otp_client_ctx {
-    char *otp;
-};
+struct otp_server_ctx;
 
-struct otp_server_ctx {
-    CURL *curlh;
-    char *url_template;
-    char *success_response;
-    char *token_id;
+#include "otp.h"
+
+#include "m_basicauth.h"
+#include "m_ykclient.h"
+
+/* Configured OTP methods.  */
+struct otp_method otp_methods[] = {
+    {"basicauth", otp_basicauth_server_init, 0, NULL, NULL},
+    {"ykclient", otp_ykclient_server_init, 0, NULL, NULL},
+    {NULL, NULL, 0, NULL, NULL}
 };
 
 /* Client.  */
@@ -294,72 +339,129 @@ process_preauth(krb5_context context, void *plugin_context,
 
 
 /* Server.  */
-#if 0                           /* Done in server_get_edata().  */
-static krb5_error_code
-get_token_id(krb5_context kcontext,
-             struct _krb5_db_entry_new *client,
-             struct otp_server_ctx *otp_ctx,
-             unsigned const char *token)
-{
-    krb5_tl_data *tl_data;
-
-    SERVER_DEBUG("%s: enter", __func__);
-
-#ifdef OATH_SPECIFIC
-    if (strlen(token) != OATH_ID_LENGTH) {
-        return EINVAL;
-    }
-#endif  /* OATH_SPECIFIC */
-
-    /* Find token id in kdb.  */
-    tl_data = client->tl_data;
-    while (tl_data != NULL) {
-        if (tl_data->tl_data_type == KRB5_TL_OTP_ID) {
-            break;
-        }
-        tl_data = tl_data->tl_data_next;
-    }
-    if (tl_data == NULL) {
-        return ENOENT;
-    }
-
-#ifdef OATH_SPECIFIC
-    if (tl_data->tl_data_length != (OATH_ID_LENGTH + 1) ||
-        tl_data->tl_data_contents[OATH_ID_LENGTH] != '\0') {
-        return EINVAL;
-    }
-    if (memcmp(token, tl_data->tl_data_contents, OATH_ID_LENGTH) == 0) {
-        SERVER_DEBUG("Token mapped: [%s]", token);
-        return 0;               /* Success.  */
-    }
-#else  /* !OATH_SPECIFIC */
-    if (token == NULL
-        || strcmp((const char *) token,
-                  (const char *) tl_data->tl_data_contents) == 0) {
-        SERVER_DEBUG("Token mapped: [%s]", token);
-        return 0;               /* Success.  */
-    }
-#endif  /* !OATH_SPECIFIC */
-
-    SERVER_DEBUG("Cannot map token [%s] to principal [%s]", token, "FIXME");
-    return ENOENT;
-}
-#endif
-
 static int
 server_get_flags(krb5_context kcontext, krb5_preauthtype pa_type)
 {
     return PA_HARDWARE | PA_REPLACES_KEY;
 }
 
+static char *
+get_config(struct otp_server_ctx *otp_ctx,
+           const char *realm_in,
+           const char *str)
+{
+    krb5_context k5_ctx = NULL;
+    krb5_error_code retval = 0;
+    char *result = NULL;
+    const char *realm = realm_in;
+    assert(otp_ctx != NULL);
+
+    k5_ctx = otp_ctx->krb5_context;
+    assert(k5_ctx != NULL);
+
+    if (realm == NULL) {
+        realm = k5_ctx->default_realm;
+    }
+    retval = profile_get_string(k5_ctx->profile, KRB5_CONF_REALMS, realm, str,
+                                NULL, &result);
+    if (retval != 0) {
+        SERVER_DEBUG("%s: profile_get_string: %d", __func__, retval);
+    }
+
+    return result;
+}
+
+static int
+search_db_type(void *krb_ctx,
+               int search, /* type */
+               void **state,
+               struct otp_tlv **tlv_out)
+{
+    struct otp_server_ctx *ctx = krb_ctx;
+    int retval = 0;
+    krb5_tl_data *tl_data = NULL;
+    struct otp_tlv *tlv = NULL;
+
+    if (state != NULL) {
+        tl_data = *state;      /* Note that this may well be NULL.  */
+    }
+    else {
+        if (ctx->client == NULL) {
+            SERVER_DEBUG("%s: called before server_get_edata()", __func__);
+            retval = EINVAL;
+            goto errout;
+        }
+        tl_data = ctx->client->tl_data;
+    }
+
+    while (tl_data != NULL) {
+        if (tl_data->tl_data_type == search) {
+            tlv = calloc(1, sizeof(*tlv));
+            if (tlv == NULL) {
+                retval = ENOMEM;
+                goto errout;
+            }
+            tlv->value = calloc(1, tl_data->tl_data_length);
+            if (tlv->value == NULL) {
+                retval = ENOMEM;
+                goto errout;
+            }
+            memcpy(tlv->value,
+                   tl_data->tl_data_contents,
+                   tl_data->tl_data_length);
+            tlv->type = tl_data->tl_data_type;
+            tlv->length = tl_data->tl_data_length;
+
+            if (state != NULL) {
+                *state = tl_data->tl_data_next;
+            }
+
+            if (tlv_out != NULL) {
+                *tlv_out = tlv;
+            }
+            break;
+        }
+
+        tl_data = tl_data->tl_data_next;
+    }
+
+    return 0;
+
+ errout:
+    if (tlv != NULL) {
+        if (tlv->value != NULL) {
+            free(tlv->value);
+        }
+        free(tlv);
+    }
+    return retval;
+}
+
+
+static void
+server_init_methods(struct otp_server_ctx *ctx)
+{
+    int f;
+
+    for (f = 0; otp_methods[f].name != NULL; f++) {
+        struct otp_method *m = &otp_methods[f];
+        if (m->init(ctx,
+                    get_config,
+                    search_db_type,
+                    &m->ftable,
+                    &m->context) == 0) {
+            m->enabled_flag = 1;
+        }
+    }
+}
+
 static krb5_error_code
-server_init(krb5_context context,
+server_init(krb5_context krb5_ctx,
             void **pa_module_context,
             const char** realmnames)
 {
     struct otp_server_ctx *ctx = NULL;
     krb5_error_code retval = 0;
-    CURLcode cret = 0;
 
     assert(pa_module_context != NULL);
 
@@ -368,38 +470,12 @@ server_init(krb5_context context,
         retval = ENOMEM;
         goto errout;
     }
+#ifdef DEBUG
+    ctx->magic = MAGIC_OTP_SERVER_CTX;
+#endif
 
-    cret = curl_global_init(CURL_GLOBAL_SSL);
-    if (cret != 0) {
-        SERVER_DEBUG("curl global init failed");
-        retval = EFAULT;
-        goto errout;
-    }
-    ctx->curlh = curl_easy_init();
-    if (ctx->curlh == NULL) {
-        SERVER_DEBUG("curl init failed");
-        retval = EFAULT;
-        goto errout;
-    }
-
-    /* Get URL template from KDC config.  */
-    retval = profile_get_string(context->profile, KRB5_CONF_REALMS,
-                                context->default_realm, OATH_URL_TEMPLATE,
-                                NULL, &ctx->url_template);
-    if (retval != 0) {
-        SERVER_DEBUG("Failed to retrive URL template");
-        goto errout;
-    }
-
-    /* Get success reponse string from KDC config.  */
-    retval = profile_get_string(context->profile, KRB5_CONF_REALMS,
-                                context->default_realm, OATH_SUCCESS_RESPONSE,
-                                NULL, &ctx->success_response);
-    if (retval != 0) {
-        SERVER_DEBUG("Failed to retrive success response string");
-        goto errout;
-    }
-
+    ctx->krb5_context = krb5_ctx;
+    server_init_methods(ctx);
     *pa_module_context = ctx;
 
     return 0;
@@ -411,16 +487,34 @@ server_init(krb5_context context,
 }
 
 static void
+method_server_fini(struct otp_server_ctx *ctx)
+{
+    int f;
+
+    for (f = 0; otp_methods[f].name != NULL; f++) {
+        struct otp_method *m = &otp_methods[f];
+        if (m->enabled_flag) {
+            m->ftable->server_fini(m->context);
+            if (m->context) {
+                free(m->context);
+            }
+            if (m->ftable) {
+                free(m->ftable);
+            }
+        }
+    }
+}
+
+static void
 server_fini(krb5_context context, void *pa_module_context)
 {
     struct otp_server_ctx *ctx = pa_module_context;
-
-    curl_easy_cleanup(ctx->curlh);
-    curl_global_cleanup();
-
     assert(ctx != NULL);
-    if (ctx->token_id != NULL)
+
+    method_server_fini(ctx);
+    if (ctx->token_id != NULL) {
         free(ctx->token_id);
+    }
     free(ctx);
 }
 
@@ -439,6 +533,9 @@ server_get_edata(krb5_context context,
     krb5_data *encoded_otp_challenge = NULL;
     krb5_tl_data *tl_data;
     struct otp_server_ctx *otp_ctx = pa_module_context;
+    char *method_name = NULL;
+    char *token_id = NULL;
+    int f;
 
     SERVER_DEBUG("%s: enter", __func__);
     assert(otp_ctx != NULL);
@@ -455,8 +552,24 @@ server_get_edata(krb5_context context,
     tl_data = client->tl_data;
     while (tl_data != NULL) {
         if (tl_data->tl_data_type == KRB5_TL_OTP_ID) {
-            /* TODO: Match with value of padata "OTP_ID".  */
-            break;
+            if (tl_data->tl_data_contents[tl_data->tl_data_length] == '\0') {
+                if (token_id != NULL) {
+                    free(token_id);
+                }
+                token_id = calloc(1, tl_data->tl_data_length);
+                if (token_id == NULL) {
+                    return ENOMEM;
+                }
+                memcpy(token_id, tl_data->tl_data_contents,
+                       tl_data->tl_data_length);
+                method_name = strchr(token_id, ':');
+                if (method_name != NULL) {
+                    *method_name++ = '\0';
+                    /* TODO: Match token_id against PA attribute
+                       "OTP_TOKENID".  */
+                    break;
+                }
+            }
         }
         tl_data = tl_data->tl_data_next;
     }
@@ -465,16 +578,27 @@ server_get_edata(krb5_context context,
         SERVER_DEBUG("OTP token id not found for principal");
         return ENOENT;
     }
-
-    otp_ctx->token_id = strndup((const char *) tl_data->tl_data_contents,
-                                tl_data->tl_data_length);
-    if (otp_ctx->token_id == NULL) {
-        SERVER_DEBUG("Unable to copy token id.");
-        return ENOMEM;
+    if (method_name == NULL) {
+        SERVER_DEBUG("OTP authentication method not configured for principal");
+        return ENOENT;
     }
 
-    SERVER_DEBUG("OTP token id [%s] found, sending OTP challenge",
-                 otp_ctx->token_id);
+    for (f = 0; otp_methods[f].name != NULL; f++) {
+        if (strcmp(otp_methods[f].name, method_name) == 0) {
+            otp_ctx->method = &otp_methods[f];
+        }
+    }
+
+    if (otp_ctx->method == NULL) {
+        SERVER_DEBUG("OTP authentication method %s not configured",
+                     method_name);
+        return ENOENT;
+    }
+
+    otp_ctx->token_id = token_id;
+    SERVER_DEBUG("OTP token id [%s] found, method [%s], sending OTP challenge",
+                 otp_ctx->token_id, method_name);
+
 
     memset(&otp_challenge, 0, sizeof(otp_challenge));
 /* "This nonce string MUST be as long as the longest key length of the
@@ -509,112 +633,6 @@ server_get_edata(krb5_context context,
     return 0;
 }
 
-#if !defined DEBUG
-static size_t
-curl_wfunc(void *ptr, size_t size, size_t nmemb, void *stream)
-{
-    return size * nmemb;
-}
-#endif  /* !DEBUG */
-
-static int
-verify_otp(const struct otp_server_ctx *ctx, const char *pw)
-{
-    CURLcode cret = 0;
-    char *url = NULL;
-    long respcode = 0;
-#ifdef DEBUG
-    char curl_errbuf[CURL_ERROR_SIZE];
-#endif
-
-    SERVER_DEBUG("%s: "
-                 "url_template=[%s] success_response=[%s]"
-                 "token id=[%s] pw=[%s]",
-                 __func__,
-                 ctx->url_template, ctx->success_response,
-                 ctx->token_id, pw);
-
-    assert(ctx != NULL);
-    assert(pw != NULL);
-
-    if (ctx->url_template == NULL) {
-        SERVER_DEBUG("Missing otp_url_template in krb5.conf.");
-        return -1;
-    }
-    if (strstr(ctx->url_template, "%s") == NULL) {
-        url = ctx->url_template;
-    }
-    else {
-        snprintf(url, sizeof(url), ctx->url_template, ctx->token_id, pw);
-    }
-
-    cret = curl_easy_setopt(ctx->curlh, CURLOPT_URL, url);
-    if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
-        return -1;
-    }
-    cret = curl_easy_setopt(ctx->curlh, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-    if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
-        return -1;
-    }
-    cret = curl_easy_setopt(ctx->curlh, CURLOPT_USERNAME, ctx->token_id);
-    if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
-        return -1;
-    }
-    cret = curl_easy_setopt(ctx->curlh, CURLOPT_PASSWORD, pw);
-    if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
-        return -1;
-    }
-    cret = curl_easy_setopt(ctx->curlh, CURLOPT_TIMEOUT_MS, 3000);
-    if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
-        return -1;
-    }
-    cret = curl_easy_setopt(ctx->curlh, CURLOPT_SSLVERSION,
-                            CURL_SSLVERSION_TLSv1);
-    if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
-        return -1;
-    }
-
-#if !defined DEBUG
-    cret = curl_easy_setopt(ctx->curlh, CURLOPT_WRITEFUNCTION, curl_wfunc);
-    if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
-        return -1;
-    }
-#endif  /* !DEBUG */
-
-#ifdef DEBUG
-    curl_easy_setopt(ctx->curlh, CURLOPT_ERRORBUFFER, curl_errbuf);
-#endif
-    cret = curl_easy_perform(ctx->curlh);
-#ifdef DEBUG
-    curl_easy_setopt(ctx->curlh, CURLOPT_ERRORBUFFER, NULL);
-#endif
-    if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d (%s)", __func__, __LINE__, cret,
-                     curl_errbuf);
-        return -1;
-    }
-
-    cret = curl_easy_getinfo(ctx->curlh, CURLINFO_RESPONSE_CODE, &respcode);
-    if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
-        return -1;
-    }
-    if (respcode == 200) {
-        SERVER_DEBUG("Successful OTP verification for %s", ctx->token_id);
-        return 0;
-    }
-
-    SERVER_DEBUG("%s: OTP authn response: %ld", __func__, respcode);
-    return -1;
-}
-
 static krb5_error_code
 server_verify_preauth(krb5_context context,
                       struct _krb5_db_entry_new *client,
@@ -636,6 +654,9 @@ server_verify_preauth(krb5_context context,
     krb5_keyblock *armor_key = NULL;
     krb5_data decrypted_data;
     struct otp_server_ctx *otp_ctx = pa_module_context;
+    krb5_tl_data *tl_data;
+    char *blob = NULL;
+    int f;
 
     assert(otp_ctx != NULL);
 
@@ -687,7 +708,37 @@ server_verify_preauth(krb5_context context,
         return ENOMEM;
     }
 
-    ret = verify_otp(otp_ctx, otp);
+    tl_data = client->tl_data;
+    while (tl_data != NULL) {
+        int found_flag = 0;
+        if (tl_data->tl_data_type == KRB5_TL_OTP_BLOB) {
+            if (blob != NULL) {
+                free(blob);
+            }
+            blob = calloc(1, tl_data->tl_data_length);
+            if (blob == NULL) {
+                return ENOMEM;
+            }
+            memcpy(blob, tl_data->tl_data_contents, tl_data->tl_data_length);
+            for (f = 0; f < tl_data->tl_data_length; f++) {
+                if (blob[f] == ':') {
+                    blob[f] = '\0';
+                    if (strcmp(blob, otp_ctx->token_id) == 0) {
+                        found_flag = 1;
+                        otp_ctx->blob = blob + f + 1;
+                        otp_ctx->blobsize = tl_data->tl_data_length - f - 1;
+                        break;
+                    }
+                }
+            }
+        }
+        if (found_flag) {
+            break;
+        }
+        tl_data = tl_data->tl_data_next;
+    }
+
+    ret = otp_ctx->method->ftable->server_verify(otp_ctx, otp);
     free(otp);
 
     SERVER_DEBUG("OTP auth result: %d", ret);
