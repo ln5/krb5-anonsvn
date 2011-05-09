@@ -183,7 +183,7 @@ get_gic_opts(krb5_context context,
             return ENOMEM;
         }
 
-        CLIENT_DEBUG("Got OTP [%s]\n", otp_ctx->otp);
+        CLIENT_DEBUG("Got OTP [%s].\n", otp_ctx->otp);
     }
 
     return 0;
@@ -211,11 +211,9 @@ process_preauth(krb5_context context, void *plugin_context,
     krb5_pa_otp_challenge *otp_challenge = NULL;
     krb5_data encoded_otp_challenge;
 
-    CLIENT_DEBUG("%s: enter\n", __func__);
-
     retval = fast_get_armor_key(context, get_data_proc, rock, &armor_key);
     if (retval != 0 || armor_key == NULL) {
-        CLIENT_DEBUG("Missing armor key\n");
+        CLIENT_DEBUG("Missing armor key.\n");
         goto errout;
     }
 
@@ -223,11 +221,11 @@ process_preauth(krb5_context context, void *plugin_context,
     retval = krb5_copy_keyblock_contents(context, armor_key, as_key);
     krb5_free_keyblock(context, armor_key);
     if (retval != 0) {
-        CLIENT_DEBUG("krb5_copy_keyblock_contents failed\n");
+        CLIENT_DEBUG("krb5_copy_keyblock_contents failed.\n");
         goto errout;
     }
 
-    CLIENT_DEBUG("Got [%d] bytes padata type [%d]\n", padata->length,
+    CLIENT_DEBUG("Got [%d] bytes padata type [%d].\n", padata->length,
                  padata->pa_type);
 
     if (padata->pa_type == KRB5_PADATA_OTP_CHALLENGE) {
