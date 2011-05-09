@@ -470,20 +470,18 @@ server_init(krb5_context krb5_ctx,
 }
 
 static void
-method_server_fini(struct otp_server_ctx *ctx)
+server_fini_methods(struct otp_server_ctx *ctx)
 {
     int f;
 
     for (f = 0; otp_methods[f].name != NULL; f++) {
         struct otp_method *m = &otp_methods[f];
         if (m->enabled_flag) {
-            m->ftable->server_fini(m->context);
-            if (m->context) {
-                free(m->context);
+            assert(m->ftable);
+            if (m->ftable->server_fini) {
+                m->ftable->server_fini(m->context);
             }
-            if (m->ftable) {
-                free(m->ftable);
-            }
+            free (m->ftable);
         }
     }
 }
@@ -494,7 +492,7 @@ server_fini(krb5_context context, void *pa_module_context)
     struct otp_server_ctx *ctx = pa_module_context;
     assert(ctx != NULL);
 
-    method_server_fini(ctx);
+    server_fini_methods(ctx);
     if (ctx->token_id != NULL) {
         free(ctx->token_id);
     }
