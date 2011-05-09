@@ -29,6 +29,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* FAST OTP plugin method for http(s) basic authentication.  */
+
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
@@ -49,7 +51,7 @@ struct otp_basicauth_ctx {
     search_db_func_t search_db;
 
     CURL *curlh;
-    char *url_template;
+    char *url;
 };
 
 static void
@@ -63,8 +65,8 @@ server_fini(void *method_context)
 
     curl_easy_cleanup(ctx->curlh);
     curl_global_cleanup();
-    if (ctx->url_template != NULL) {
-        free(ctx->url_template);
+    if (ctx->url != NULL) {
+        free(ctx->url);
     }
     free(ctx);
 }
@@ -82,13 +84,8 @@ verify_otp(const struct otp_server_ctx *otp_ctx, const char *pw)
 {
     struct otp_basicauth_ctx *ctx;
     CURLcode cret = 0;
-    char urlbuf[120];
-    char *url = NULL;
     char *username = NULL;
     long respcode = 0;
-    int format_flag;
-    int count;
-    char *cp = NULL;
 #ifdef DEBUG
     char curl_errbuf[CURL_ERROR_SIZE];
 #endif
@@ -102,73 +99,32 @@ verify_otp(const struct otp_server_ctx *otp_ctx, const char *pw)
     assert(ctx->magic == MAGIC_OTP_BASICAUTH_CTX);
 #endif
 
-    SERVER_DEBUG("%s: "
-                 "url_template=[%s] "
-                 "token id=[%s] pw=[%s]",
-                 __func__,
-                 ctx->url_template,
-                 otp_ctx->token_id, pw);
-
     assert(ctx != NULL);
 
     if (pw == NULL) {
-        SERVER_DEBUG("%s: missing OTP", __func__);
+        SERVER_DEBUG("[basicauth] OTP is missing.");
         return EINVAL;
     }
 
     /* Blob contains username.  */
     if (ctx->otp_context->blob == NULL) {
-        SERVER_DEBUG("[OTP basicauth] Missing blob.");
+        SERVER_DEBUG("[basicauth] Binary blob is missing.");
         return EINVAL;
     }
     if (ctx->otp_context->blob[ctx->otp_context->blobsize] != '\0') {
-        SERVER_DEBUG("Invalid blob of length %lu.", ctx->otp_context->blobsize);
+        SERVER_DEBUG("[basicauth] Invalid blob of length %lu.",
+                     ctx->otp_context->blobsize);
         return EINVAL;
     }
     username = ctx->otp_context->blob;
 
-    /* Find out URL.  The URL template is taken from krb5.conf.  If it
-       contains any formatting directives (i.e. any '%') they must be
-       string directives ('%s') and be exactly two -- the first for
-       token id and the second for the OTP.  */
-    if (ctx->url_template == NULL) {
-        SERVER_DEBUG("Missing otp_url_template in krb5.conf.");
+    if (ctx->url == NULL) {
+        SERVER_DEBUG("[basicauth] Missing otp_url_template in krb5.conf.");
         return EINVAL;
     }
-    format_flag = 0;
-    count = 0;
-    for (cp = ctx->url_template; *cp != '\0'; cp++) {
-        if (*cp == '%') {
-            format_flag = 1;
-            if (*++cp == 's') {
-                if (++count == 2) {
-                    break;
-                }
-            }
-        }
-    }
-    if (format_flag) {
-        if (count == 2) {
-            snprintf(urlbuf, sizeof(urlbuf), ctx->url_template,
-                     otp_ctx->token_id, pw);
-            url = urlbuf;
-        }
-        else {
-            SERVER_DEBUG("[m_basicauth] Invalid URL template: [%s]",
-                         ctx->url_template);
-            SERVER_DEBUG("[m_basicauth] The URL template may contain two "
-                         "\"%%s\"");
-            return EINVAL;
-        }
-    }
-    else {
-        url = ctx->url_template;
-    }
-
-    SERVER_DEBUG("[m_basicauth] Using URL [%s]", url);
 
     /* Set curl options.  */
-    cret = curl_easy_setopt(ctx->curlh, CURLOPT_URL, url);
+    cret = curl_easy_setopt(ctx->curlh, CURLOPT_URL, ctx->url);
     if (cret != CURLE_OK) {
         SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
         return 200 + cret;
@@ -231,7 +187,7 @@ verify_otp(const struct otp_server_ctx *otp_ctx, const char *pw)
         return 0;
     }
 
-    SERVER_DEBUG("[m_basicauth] OTP authn response: %ld", respcode);
+    SERVER_DEBUG("[basicauth] OTP authn response: %ld", respcode);
     return EACCES;
 }
 
@@ -266,11 +222,11 @@ otp_basicauth_server_init(struct otp_server_ctx *otp_ctx,
     ft->server_fini = server_fini;
     ft->server_verify = verify_otp;
 
-    ctx->url_template = get_config(otp_ctx, NULL, URL_TEMPLATE);
+    ctx->url = get_config(otp_ctx, NULL, URL_TEMPLATE);
 
     cret = curl_global_init(CURL_GLOBAL_SSL);
     if (cret != 0) {
-        SERVER_DEBUG("curl global init failed");
+        SERVER_DEBUG("[basicauth] curl global init failed.");
         retval = EFAULT;
         goto errout;
     }
@@ -278,7 +234,7 @@ otp_basicauth_server_init(struct otp_server_ctx *otp_ctx,
 
     ctx->curlh = curl_easy_init();
     if (ctx->curlh == NULL) {
-        SERVER_DEBUG("curl init failed");
+        SERVER_DEBUG("[basicauth] curl init failed.");
         retval = EFAULT;
         goto errout;
     }
@@ -292,8 +248,8 @@ otp_basicauth_server_init(struct otp_server_ctx *otp_ctx,
         curl_global_cleanup();
     if (ctx->curlh != NULL)
         curl_easy_cleanup(ctx->curlh);
-    if (ctx->url_template != NULL)
-        free(ctx->url_template);
+    if (ctx->url != NULL)
+        free(ctx->url);
     if (ctx != NULL)
         free(ctx);
     if (ft != NULL)
