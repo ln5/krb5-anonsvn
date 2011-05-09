@@ -646,37 +646,40 @@ server_verify_preauth(krb5_context context,
 
     retval = decode_krb5_pa_otp_req(&encoded_otp_req, &otp_req);
     if (retval != 0) {
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+        SERVER_DEBUG("Decoding OTP request failed.");
+        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        goto errout;
     }
 
     /* FIXME: So far I only check if some encryted data is present. To verify it
      * the nonce must be put into a PA-FX-COOKIE and I don't know how to do it. */
     if (otp_req->enc_data.ciphertext.data == NULL) {
         SERVER_DEBUG("Missing encrypted data.");
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        goto errout;
     }
 
     decrypted_data.length = otp_req->enc_data.ciphertext.length;
     decrypted_data.data = (char *) malloc(decrypted_data.length);
     if (decrypted_data.data == NULL) {
         SERVER_DEBUG("malloc failed.");
-        return ENOMEM;
+        retval = ENOMEM;
+        goto errout;
     }
 
     retval = fast_kdc_get_armor_key(context, server_get_entry_data, request,
                                     client, &armor_key);
-    if (retval != 0 || armor_key == NULL) {
+    if (retval != 0) {
         krb5_free_keyblock(context, armor_key);
-        return EINVAL;
+        retval = EINVAL;
+        goto errout;
     }
 
     retval = krb5_c_decrypt(context, armor_key, KRB5_KEYUSAGE_PA_OTP_REQUEST,
                             NULL, &otp_req->enc_data, &decrypted_data);
     if (retval != 0) {
         SERVER_DEBUG("krb5_c_decrypt failed.");
-        krb5_free_data_contents(context, &decrypted_data);
-        krb5_free_keyblock(context, armor_key);
-        return retval;
+        goto errout;
     }
     krb5_free_data_contents(context, &decrypted_data);
 
@@ -684,9 +687,9 @@ server_verify_preauth(krb5_context context,
                  otp_req->otp_value.data);
     otp = strndup(otp_req->otp_value.data, otp_req->otp_value.length);
     if (otp == NULL) {
-        SERVER_DEBUG("strndup failed");
-        krb5_free_keyblock(context, armor_key);
-        return ENOMEM;
+        SERVER_DEBUG("strndup failed.");
+        retval = ENOMEM;
+        goto errout;
     }
 
     tl_data = client->tl_data;
@@ -698,7 +701,8 @@ server_verify_preauth(krb5_context context,
             }
             blob = calloc(1, tl_data->tl_data_length);
             if (blob == NULL) {
-                return ENOMEM;
+                retval = ENOMEM;
+                goto errout;
             }
             memcpy(blob, tl_data->tl_data_contents, tl_data->tl_data_length);
             for (f = 0; f < tl_data->tl_data_length; f++) {
@@ -723,19 +727,26 @@ server_verify_preauth(krb5_context context,
     free(otp);
 
     if (ret != 0) {
-        SERVER_DEBUG("Bad OTP verification: %d", ret);
-        *pa_request_context = NULL;
-        krb5_free_keyblock(context, armor_key);
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+        SERVER_DEBUG("OTP verification failed with %d.", ret);
+        *pa_request_context = NULL; /* FIXME: Really touch context
+                                       here and only here? */
+        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        goto errout;
     }
 
     *pa_request_context = armor_key;
-
     enc_tkt_reply->flags |= TKT_FLG_PRE_AUTH;
     enc_tkt_reply->flags |= TKT_FLG_HW_AUTH;
 
-    SERVER_DEBUG("Successful OTP verification for [%s]", otp_ctx->token_id);
+    SERVER_DEBUG("OTP verification succeeded for [%s]", otp_ctx->token_id);
     return 0;
+
+ errout:
+    krb5_free_data_contents(context, &decrypted_data);
+    if (armor_key != NULL) {
+        krb5_free_keyblock(context, armor_key);
+    }
+    return retval;
 }
 
 static krb5_error_code
