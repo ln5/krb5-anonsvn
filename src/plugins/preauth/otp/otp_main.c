@@ -741,9 +741,8 @@ server_verify_preauth(krb5_context context,
     ret = otp_ctx->method->ftable->server_verify(otp_ctx, otp);
     free(otp);
 
-    SERVER_DEBUG("OTP auth result: %d", ret);
-
-    if (ret) {
+    if (ret != 0) {
+        SERVER_DEBUG("Bad OTP verification: %d", ret);
         *pa_request_context = NULL;
         krb5_free_keyblock(context, armor_key);
         return KRB5KDC_ERR_PREAUTH_FAILED;
@@ -754,6 +753,7 @@ server_verify_preauth(krb5_context context,
     enc_tkt_reply->flags |= TKT_FLG_PRE_AUTH;
     enc_tkt_reply->flags |= TKT_FLG_HW_AUTH;
 
+    SERVER_DEBUG("Successful OTP verification for [%s]", otp_ctx->token_id);
     return 0;
 }
 
