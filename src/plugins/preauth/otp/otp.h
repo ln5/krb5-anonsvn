@@ -28,7 +28,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-//#include <stddef.h>
+
 #include <krb5/krb5.h>
 #include <kdb.h>
 #include "adm_proto.h"          /* for krb5_klog_syslog */
