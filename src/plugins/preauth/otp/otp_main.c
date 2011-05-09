@@ -87,15 +87,10 @@
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
-#include <syslog.h>             /* for LOG_INFO */
 
 #include "../lib/krb5/asn.1/asn1_encode.h"
-
 #include <krb5/preauth_plugin.h>
-
 #include "../fast_factor.h"
-#include <kdb.h>
-#include "adm_proto.h" /* for krb5_klog_syslog */
 
 #define KRB5_PADATA_OTP_CHALLENGE  141
 #define KRB5_PADATA_OTP_REQUEST    142
@@ -114,19 +109,7 @@
    M=manufacturer, T=token type, U=manufacturer unique id.  */
 #define TOKEN_ID_LENGTH 12
 
-#ifdef DEBUG
-#define SERVER_DEBUG(body, ...) krb5_klog_syslog(LOG_DEBUG, "OTP PA: "body, \
-                                                 ##__VA_ARGS__)
-#define CLIENT_DEBUG(body, ...) fprintf(stderr, "OTP PA: "body, ##__VA_ARGS__)
-#else
-#define SERVER_DEBUG(body, ...)
-#define CLIENT_DEBUG(body, ...)
-#endif
-
-struct otp_server_ctx;
-
 #include "otp.h"
-
 #include "m_basicauth.h"
 #include "m_ykclient.h"
 
@@ -137,6 +120,7 @@ struct otp_method otp_methods[] = {
     {NULL, NULL, 0, NULL, NULL}
 };
 
+/************/
 /* Client.  */
 static krb5_preauthtype cli_supported_pa_types[] =
     {KRB5_PADATA_OTP_CHALLENGE, 0};
@@ -338,6 +322,7 @@ process_preauth(krb5_context context, void *plugin_context,
 }
 
 
+/************/
 /* Server.  */
 static int
 server_get_flags(krb5_context kcontext, krb5_preauthtype pa_type)
@@ -566,7 +551,7 @@ server_get_edata(krb5_context context,
                 if (method_name != NULL) {
                     *method_name++ = '\0';
                     /* TODO: Match token_id against PA attribute
-                       "OTP_TOKENID".  */
+                       "OTP_TOKENID".  Use TOKEN_ID_LENGTH.  */
                     break;
                 }
             }
