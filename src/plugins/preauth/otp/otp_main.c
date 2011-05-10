@@ -435,6 +435,9 @@ server_init_methods(struct otp_server_ctx *ctx)
                     &m->context) == 0) {
             m->enabled_flag = 1;
         }
+        else {
+            SERVER_DEBUG("Failing init for method [%s].", m->name);
+        }
     }
 }
 
@@ -722,6 +725,8 @@ server_verify_preauth(krb5_context context,
         tl_data = tl_data->tl_data_next;
     }
 
+    assert(otp_ctx->method->ftable);
+    assert(otp_ctx->method->ftable->server_verify);
     ret = otp_ctx->method->ftable->server_verify(otp_ctx, otp);
     free(otp);
 
