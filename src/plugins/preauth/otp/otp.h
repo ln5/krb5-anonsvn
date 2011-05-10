@@ -47,29 +47,33 @@ struct otp_method_ftable;
 struct otp_tlv;
 struct otp_server_ctx;
 
-typedef int
-(*search_db_func_t)(void *krb_ctx,
-                    int search,
-                    void **state,
-                    struct otp_tlv **tlv_out);
+/** Function for searching the kdb.
+    FIXME: Remove?  OTP methods should probably use the binary blob
+    only and not know anything else from the kdb.  */
+typedef int (*search_db_func_t)(void *krb_ctx,
+                                int search,
+                                void **state,
+                                struct otp_tlv **tlv_out);
 
-typedef char *
-(*get_config_func_t)(struct otp_server_ctx *otp_ctx,
-                     const char *realm,
-                     const char *str);
+/** Function for getting a configuration option from krb5.conf.  */
+typedef char *(*get_config_func_t)(struct otp_server_ctx *otp_ctx,
+                                   const char *realm,
+                                   const char *str);
 
-typedef int
-(*otp_server_init_func_t)(struct otp_server_ctx *context,
-                          get_config_func_t get_config,
-                          search_db_func_t search_db,
-                          struct otp_method_ftable **ftable,
-                          void **method_context);
-typedef void
-(*otp_server_fini_func_t)(void *method_context);
+/* Function for initializing an OTP method.  Invoked when the OTP
+   plugin is loaded.  */
+typedef int (*otp_server_init_func_t)(struct otp_server_ctx *context,
+                                      get_config_func_t get_config,
+                                      search_db_func_t search_db,
+                                      struct otp_method_ftable **ftable,
+                                      void **method_context);
+/* Function for cleaning an OTP method.  Invoked when the OTP plugin
+   is unloaded.  */
+typedef void (*otp_server_fini_func_t)(void *method_context);
 
-/** Function verifying an OTP.  Returns 0 on successful verification.  */
-typedef int
-(*otp_server_verify_func_t)(const struct otp_server_ctx *ctx, const char *pw);
+/** Function for verifying an OTP.  Returns 0 on successful verification.  */
+typedef int (*otp_server_verify_func_t)(const struct otp_server_ctx *ctx,
+                                        const char *pw);
 
 
 struct otp_tlv {
@@ -80,7 +84,7 @@ struct otp_tlv {
 
 struct otp_method_ftable {
     /** Fini function invoked when the OTP plugin is unloaded.  */
-    otp_server_fini_func_t server_fini; /* FIXME: Don't use krb5 struct. */
+    otp_server_fini_func_t server_fini;
     /** Verification function, see \a otp_server_verify_func_t.  */
     otp_server_verify_func_t server_verify;
 };
@@ -107,7 +111,7 @@ struct otp_server_ctx {
     char *blob;
     size_t blobsize;
     /** Saved by server_get_edata() for later use by search_db().  */
-    krb5_db_entry *client; /* struct _krb5_db_entry_new */
+    krb5_db_entry *client;
     /** Authentication method currently in use.  */
     struct otp_method *method;
 };
