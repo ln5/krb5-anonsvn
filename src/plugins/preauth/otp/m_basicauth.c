@@ -82,24 +82,19 @@ curl_wfunc(void *ptr, size_t size, size_t nmemb, void *stream)
 static int
 verify_otp(const struct otp_server_ctx *otp_ctx, const char *pw)
 {
-    struct otp_basicauth_ctx *ctx;
-    CURLcode cret = 0;
+    struct otp_basicauth_ctx *ctx = NULL;
     char *username = NULL;
+    CURLcode cret = 0;
     long respcode = 0;
 #ifdef DEBUG
     char curl_errbuf[CURL_ERROR_SIZE];
 #endif
-    assert(otp_ctx != NULL);
-#ifdef DEBUG
-    assert(otp_ctx->magic == MAGIC_OTP_SERVER_CTX);
-#endif
 
-    ctx = otp_ctx->method->context;
+    ctx = OTP_METHOD_CONTEXT(otp_ctx);
+    assert(ctx != NULL);
 #ifdef DEBUG
     assert(ctx->magic == MAGIC_OTP_BASICAUTH_CTX);
 #endif
-
-    assert(ctx != NULL);
 
     if (pw == NULL) {
         SERVER_DEBUG("[basicauth] OTP is missing.");

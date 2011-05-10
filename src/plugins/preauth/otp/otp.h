@@ -43,6 +43,8 @@
 #define CLIENT_DEBUG(body, ...)
 #endif
 
+#define OTP_METHOD_CONTEXT(c) (c)->method->context
+
 struct otp_method_ftable;
 struct otp_tlv;
 struct otp_server_ctx;
