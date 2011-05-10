@@ -348,7 +348,7 @@ get_config(struct otp_server_ctx *otp_ctx,
     retval = profile_get_string(k5_ctx->profile, KRB5_CONF_REALMS, realm, str,
                                 NULL, &result);
     if (retval != 0) {
-        SERVER_DEBUG("%s: profile_get_string: %d", __func__, retval);
+        SERVER_DEBUG("%s: profile_get_string error: %d.", __func__, retval);
     }
 
     return result;
@@ -370,7 +370,7 @@ search_db_type(void *krb_ctx,
     }
     else {
         if (ctx->client == NULL) {
-            SERVER_DEBUG("%s: called before server_get_edata()", __func__);
+            SERVER_DEBUG("%s: called before server_get_edata().", __func__);
             retval = EINVAL;
             goto errout;
         }
@@ -518,13 +518,12 @@ server_get_edata(krb5_context context,
     char *token_id = NULL;
     int f;
 
-    SERVER_DEBUG("%s: enter", __func__);
     assert(otp_ctx != NULL);
 
     retval = fast_kdc_get_armor_key(context, server_get_entry_data, request,
                                     client, &armor_key);
     if (retval != 0 || armor_key == NULL) {
-        SERVER_DEBUG("No armor key found");
+        SERVER_DEBUG("No armor key found.");
         krb5_free_keyblock(context, armor_key);
         return EINVAL;
     }
@@ -556,7 +555,7 @@ server_get_edata(krb5_context context,
     }
 
     if (tl_data == NULL) {
-        SERVER_DEBUG("OTP token id not found for principal");
+        SERVER_DEBUG("OTP token id not found for principal.");
         return ENOENT;
     }
     if (method_name == NULL) {
@@ -571,13 +570,13 @@ server_get_edata(krb5_context context,
     }
 
     if (otp_ctx->method == NULL) {
-        SERVER_DEBUG("OTP authentication method %s not configured",
+        SERVER_DEBUG("OTP authentication method %s not configured.",
                      method_name);
         return ENOENT;
     }
 
     otp_ctx->token_id = token_id;
-    SERVER_DEBUG("OTP token id [%s] found, method [%s], sending OTP challenge",
+    SERVER_DEBUG("OTP token id [%s] found, method [%s], sending OTP challenge.",
                  otp_ctx->token_id, method_name);
 
 
@@ -590,12 +589,12 @@ server_get_edata(krb5_context context,
     otp_challenge.nonce.length = 32;
     otp_challenge.nonce.data = (char *) malloc(otp_challenge.nonce.length + 1);
     if (otp_challenge.nonce.data == NULL) {
-        SERVER_DEBUG("malloc failed");
+        SERVER_DEBUG("malloc failed.");
         return ENOMEM;
     }
     retval = krb5_c_random_make_octets(context, &otp_challenge.nonce);
     if(retval != 0) {
-        SERVER_DEBUG("krb5_c_random_make_octets failed");
+        SERVER_DEBUG("krb5_c_random_make_octets failed.");
         return retval;
     }
 
@@ -603,7 +602,7 @@ server_get_edata(krb5_context context,
 
     retval = encode_krb5_pa_otp_challenge(&otp_challenge, &encoded_otp_challenge);
     if (retval != 0) {
-        SERVER_DEBUG("encode_krb5_pa_otp_challenge failed");
+        SERVER_DEBUG("encode_krb5_pa_otp_challenge failed.");
         return retval;
     }
 
@@ -738,7 +737,7 @@ server_verify_preauth(krb5_context context,
     enc_tkt_reply->flags |= TKT_FLG_PRE_AUTH;
     enc_tkt_reply->flags |= TKT_FLG_HW_AUTH;
 
-    SERVER_DEBUG("OTP verification succeeded for [%s]", otp_ctx->token_id);
+    SERVER_DEBUG("OTP verification succeeded for [%s].", otp_ctx->token_id);
     return 0;
 
  errout:
@@ -766,7 +765,6 @@ server_return(krb5_context kcontext,
     krb5_keyblock *reply_key = NULL;
     krb5_error_code retval;
 
-    SERVER_DEBUG("%s: enter", __func__);
     if (pa_request_context == NULL || *pa_request_context == NULL) {
         SERVER_DEBUG("Not handled by me.");
         return 0;
