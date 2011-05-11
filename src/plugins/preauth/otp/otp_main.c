@@ -149,8 +149,7 @@ cli_fini(krb5_context context, void *blob)
         return;
     }
 
-    if (ctx->otp != NULL)
-        free(ctx->otp);
+    free(ctx->otp);
     free(ctx);
 }
 
@@ -311,11 +310,8 @@ process_preauth(krb5_context context, void *plugin_context,
     return 0;
 
  errout:
-    if (pa_array != NULL)
-        free(pa_array);
-    if (pa != NULL)
-        free(pa);
-
+    free(pa_array);
+    free(pa);
     return retval;
 }
 
@@ -412,11 +408,9 @@ search_db_type(void *krb_ctx,
 
  errout:
     if (tlv != NULL) {
-        if (tlv->value != NULL) {
-            free(tlv->value);
-        }
-        free(tlv);
+        free(tlv->value);
     }
+    free(tlv);
     return retval;
 }
 
@@ -467,8 +461,7 @@ server_init(krb5_context krb5_ctx,
     return 0;
 
  errout:
-    if (ctx != NULL)
-        free (ctx);
+    free (ctx);
     return retval;
 }
 
@@ -496,9 +489,7 @@ server_fini(krb5_context context, void *pa_module_context)
     assert(ctx != NULL);
 
     server_fini_methods(ctx);
-    if (ctx->token_id != NULL) {
-        free(ctx->token_id);
-    }
+    free(ctx->token_id);
     free(ctx);
 }
 
@@ -536,9 +527,7 @@ server_get_edata(krb5_context context,
     while (tl_data != NULL) {
         if (tl_data->tl_data_type == KRB5_TL_OTP_ID) {
             if (tl_data->tl_data_contents[tl_data->tl_data_length] == '\0') {
-                if (token_id != NULL) {
-                    free(token_id);
-                }
+                free(token_id);
                 token_id = calloc(1, tl_data->tl_data_length);
                 if (token_id == NULL) {
                     return ENOMEM;
@@ -698,9 +687,7 @@ server_verify_preauth(krb5_context context,
     while (tl_data != NULL) {
         int found_flag = 0;
         if (tl_data->tl_data_type == KRB5_TL_OTP_BLOB) {
-            if (blob != NULL) {
-                free(blob);
-            }
+            free(blob);
             blob = calloc(1, tl_data->tl_data_length);
             if (blob == NULL) {
                 retval = ENOMEM;

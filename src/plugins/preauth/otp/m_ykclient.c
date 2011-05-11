@@ -160,11 +160,7 @@ otp_ykclient_server_init(struct otp_server_ctx *otp_ctx,
     if (ctx->yk_ctx != NULL) {
         ykclient_done(&ctx->yk_ctx);
     }
-    if (ft != NULL) {
-        free(ft);
-    }
-    if (ctx != NULL) {
-        free(ctx);
-    }
+    free(ft);
+    free(ctx);
     return retval;
 }

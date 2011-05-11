@@ -65,9 +65,7 @@ server_fini(void *method_context)
 
     curl_easy_cleanup(ctx->curlh);
     curl_global_cleanup();
-    if (ctx->url != NULL) {
-        free(ctx->url);
-    }
+    free(ctx->url);
     free(ctx);
 }
 
@@ -239,15 +237,14 @@ otp_basicauth_server_init(struct otp_server_ctx *otp_ctx,
     return 0;
 
  errout:
-    if (curl_global_init_done_flag)
+    if (curl_global_init_done_flag) {
         curl_global_cleanup();
-    if (ctx->curlh != NULL)
+    }
+    if (ctx->curlh != NULL) {
         curl_easy_cleanup(ctx->curlh);
-    if (ctx->url != NULL)
-        free(ctx->url);
-    if (ctx != NULL)
-        free(ctx);
-    if (ft != NULL)
-        free(ft);
+    }
+    free(ctx->url);
+    free(ctx);
+    free(ft);
     return retval;
 }
