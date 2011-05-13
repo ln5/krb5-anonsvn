@@ -712,15 +712,16 @@ server_verify_preauth(krb5_context context,
         tl_data = tl_data->tl_data_next;
     }
 
-    assert(otp_ctx->method->ftable);
-    assert(otp_ctx->method->ftable->server_verify);
+    assert(otp_ctx->method->ftable != NULL);
+    assert(otp_ctx->method->ftable->server_verify != NULL);
     ret = otp_ctx->method->ftable->server_verify(otp_ctx, otp);
     free(otp);
 
     if (ret != 0) {
         SERVER_DEBUG("OTP verification failed with %d.", ret);
         *pa_request_context = NULL; /* FIXME: Really touch context
-                                       here and only here? */
+                                       here and only here in the error
+                                       path? */
         retval = KRB5KDC_ERR_PREAUTH_FAILED;
         goto errout;
     }
