@@ -924,6 +924,7 @@ get_preauth_hint_list(krb5_kdc_req *request, krb5_db_entry *client,
     int hw_only;
     krb5_preauth_systems *ap;
     krb5_pa_data **pa_data, **pa;
+    krb5_pa_data *cookie = NULL;
     krb5_data *edat;
     krb5_error_code retval;
 
@@ -938,6 +939,12 @@ get_preauth_hint_list(krb5_kdc_req *request, krb5_db_entry *client,
         return;
     pa = pa_data;
 
+    cookie = calloc(1, sizeof(krb5_pa_data));
+    if (cookie == NULL)
+        goto errout;
+    cookie->magic = KV5M_PA_DATA;
+    cookie->pa_type = KRB5_PADATA_FX_COOKIE;
+
     for (ap = preauth_systems; ap->type != -1; ap++) {
         if (hw_only && !(ap->flags & PA_HARDWARE))
             continue;
@@ -951,12 +958,19 @@ get_preauth_hint_list(krb5_kdc_req *request, krb5_db_entry *client,
         (*pa)->pa_type = ap->type;
         if (ap->get_edata) {
             retval = (ap->get_edata)(kdc_context, request, client, server,
-                                     get_entry_data, ap->plugin_context, *pa);
+                                     get_entry_data, ap->plugin_context, *pa,
+                                     cookie);
             if (retval) {
                 /* just failed on this type, continue */
                 free(*pa);
                 *pa = 0;
                 continue;
+            }
+            /* This is a hack.  Only one -- the first -- preauth
+               system can set the cookie.  */
+            if (cookie->length) {
+                *++pa = cookie;
+                cookie = NULL;
             }
         }
         pa++;
@@ -966,11 +980,14 @@ get_preauth_hint_list(krb5_kdc_req *request, krb5_db_entry *client,
                           "%spreauth required but hint list is empty",
                           hw_only ? "hw" : "");
     }
-    /*
-     * If we fail to get the cookie it is probably
-     * still reasonable to continue with the response
-     */
-    kdc_preauth_get_cookie(request->kdc_state, pa);
+
+    if (find_pa_data(pa_data, KRB5_PADATA_FX_COOKIE) == NULL) {
+        /*
+         * If we fail to get the cookie it is probably
+         * still reasonable to continue with the response
+         */
+        kdc_preauth_get_cookie(request->kdc_state, pa);
+    }
     retval = encode_krb5_padata_sequence(pa_data, &edat);
     if (retval)
         goto errout;
@@ -979,6 +996,7 @@ get_preauth_hint_list(krb5_kdc_req *request, krb5_db_entry *client,
 
 errout:
     krb5_free_pa_data(kdc_context, pa_data);
+    free(cookie);
     return;
 }
 
@@ -1046,6 +1064,7 @@ check_padata (krb5_context context, krb5_db_entry *client, krb5_data *req_pkt,
 {
     krb5_error_code retval = 0;
     krb5_pa_data **padata;
+    krb5_pa_data *cookie = NULL;
     krb5_preauth_systems *pa_sys;
     void **pa_context;
     krb5_data *pa_e_data = NULL, *tmp_e_data = NULL;
@@ -1061,6 +1080,8 @@ check_padata (krb5_context context, krb5_db_entry *client, krb5_data *req_pkt,
     if (make_padata_context(context, padata_context) != 0) {
         return KRB5KRB_ERR_GENERIC;
     }
+
+    cookie = find_pa_data(request->padata, KRB5_PADATA_FX_COOKIE);
 
 #ifdef DEBUG
     krb5_klog_syslog (LOG_DEBUG, "checking padata");
@@ -1080,7 +1101,7 @@ check_padata (krb5_context context, krb5_db_entry *client, krb5_data *req_pkt,
             continue;
         pa_found++;
         retval = pa_sys->verify_padata(context, client, req_pkt, request,
-                                       enc_tkt_reply, *padata,
+                                       enc_tkt_reply, *padata, cookie,
                                        get_entry_data, pa_sys->plugin_context,
                                        pa_context, &tmp_e_data, &tmp_authz_data);
         if (retval) {

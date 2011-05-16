@@ -251,7 +251,8 @@ server_get_edata(krb5_context kcontext,
                  struct _krb5_db_entry_new *server,
                  preauth_get_entry_data_proc server_get_entry_data,
                  void *pa_module_context,
-                 krb5_pa_data *data)
+                 krb5_pa_data *data,
+                 krb5_pa_data *cookie)
 {
     /* Return zero bytes of data. */
     data->length = 0;
@@ -267,6 +268,7 @@ server_verify(krb5_context kcontext,
               krb5_kdc_req *request,
               krb5_enc_tkt_part *enc_tkt_reply,
               krb5_pa_data *data,
+              const krb5_pa_data *cookie,
               preauth_get_entry_data_proc server_get_entry_data,
               void *pa_module_context,
               void **pa_request_context,

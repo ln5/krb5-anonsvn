@@ -118,7 +118,8 @@ kdc_include_padata(krb5_context context, krb5_kdc_req *request,
                    struct _krb5_db_entry_new *client,
                    struct _krb5_db_entry_new *server,
                    preauth_get_entry_data_proc get_entry_proc,
-                   void *pa_module_context, krb5_pa_data *pa_data)
+                   void *pa_module_context, krb5_pa_data *pa_data,
+                   krb5_pa_data *cookie)
 {
     krb5_error_code retval;
     krb5_data *client_keys_data = NULL;
@@ -207,6 +208,7 @@ static krb5_error_code
 kdc_verify_preauth(krb5_context context, struct _krb5_db_entry_new *client,
                    krb5_data *req_pkt, krb5_kdc_req *request,
                    krb5_enc_tkt_part *enc_tkt_reply, krb5_pa_data *pa_data,
+                   const krb5_pa_data *cookie,
                    preauth_get_entry_data_proc get_entry_proc,
                    void *pa_module_context, void **opaque,
                    krb5_data **e_data, krb5_authdata ***authz_data)

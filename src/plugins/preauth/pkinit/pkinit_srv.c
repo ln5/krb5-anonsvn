@@ -102,7 +102,8 @@ pkinit_server_get_edata(krb5_context context,
                         struct _krb5_db_entry_new * server,
                         preauth_get_entry_data_proc server_get_entry_data,
                         void *pa_plugin_context,
-                        krb5_pa_data * data)
+                        krb5_pa_data * data,
+                        krb5_pa_data * cookie)
 {
     krb5_error_code retval = 0;
     pkinit_kdc_context plgctx = NULL;
@@ -292,6 +293,7 @@ pkinit_server_verify_padata(krb5_context context,
                             krb5_kdc_req * request,
                             krb5_enc_tkt_part * enc_tkt_reply,
                             krb5_pa_data * data,
+                            const krb5_pa_data *cookie,
                             preauth_get_entry_data_proc server_get_entry_data,
                             void *pa_plugin_context,
                             void **pa_request_context,

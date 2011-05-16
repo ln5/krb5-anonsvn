@@ -122,6 +122,24 @@ struct otp_method otp_methods[] = {
 
 /************/
 /* Client.  */
+#if defined(DEBUG)
+char *
+_format_nonce(const krb5_data *nonce);
+char *
+_format_nonce(const krb5_data *nonce)
+{
+    char *s = NULL;
+    unsigned int f;
+
+    s = calloc(1, 2 * nonce->length + 1);
+    assert(s != NULL);
+    for (f = 0; f < nonce->length; f++) {
+        sprintf(s + f * 2, "%02x", nonce->data[f] & 0xff);
+    }
+    return s;
+}
+#endif  /* DEBUG */
+
 static krb5_preauthtype cli_supported_pa_types[] =
     {KRB5_PADATA_OTP_CHALLENGE, 0};
 
@@ -243,6 +261,13 @@ process_preauth(krb5_context context, void *plugin_context,
             retval = EINVAL;
             goto errout;
         }
+#ifdef DEBUG
+        {
+            char *s = _format_nonce(&otp_challenge->nonce);
+            CLIENT_DEBUG("Nonce: [%s]\n", s);
+            free(s);
+        }
+#endif  /* DEBUG */
 
         memset(&otp_req, 0, sizeof(otp_req));
 
@@ -500,7 +525,8 @@ server_get_edata(krb5_context context,
                  struct _krb5_db_entry_new *server,
                  preauth_get_entry_data_proc server_get_entry_data,
                  void *pa_module_context,
-                 krb5_pa_data *pa_data)
+                 krb5_pa_data *pa_data,
+                 krb5_pa_data *cookie)
 {
     krb5_error_code retval = 0;
     krb5_keyblock *armor_key = NULL;
@@ -518,8 +544,8 @@ server_get_edata(krb5_context context,
                                     client, &armor_key);
     if (retval != 0 || armor_key == NULL) {
         SERVER_DEBUG("No armor key found.");
-        krb5_free_keyblock(context, armor_key);
-        return EINVAL;
+        retval = EINVAL;
+        goto errout;
     }
 
     /* Find (the right) token id.  Store a copy of it in otp_ctx.  */
@@ -548,11 +574,13 @@ server_get_edata(krb5_context context,
 
     if (tl_data == NULL) {
         SERVER_DEBUG("OTP token id not found for principal.");
-        return ENOENT;
+        retval = ENOENT;
+        goto errout;
     }
     if (method_name == NULL) {
         SERVER_DEBUG("OTP authentication method not configured for principal");
-        return ENOENT;
+        retval = ENOENT;
+        goto errout;
     }
 
     for (f = 0; otp_methods[f].name != NULL; f++) {
@@ -564,13 +592,13 @@ server_get_edata(krb5_context context,
     if (otp_ctx->method == NULL) {
         SERVER_DEBUG("OTP authentication method %s not configured.",
                      method_name);
-        return ENOENT;
+        retval = ENOENT;
+        goto errout;
     }
 
     otp_ctx->token_id = token_id;
     SERVER_DEBUG("OTP token id [%s] found, method [%s], sending OTP challenge.",
                  otp_ctx->token_id, method_name);
-
 
     memset(&otp_challenge, 0, sizeof(otp_challenge));
 /* "This nonce string MUST be as long as the longest key length of the
@@ -579,30 +607,70 @@ server_get_edata(krb5_context context,
  * FIXME: how do I find out the length of the longest key? I take 256 bits for
  * a start. */
     otp_challenge.nonce.length = 32;
+    /* FIXME: Why do we allocate 32+1?  */
     otp_challenge.nonce.data = (char *) malloc(otp_challenge.nonce.length + 1);
     if (otp_challenge.nonce.data == NULL) {
-        SERVER_DEBUG("malloc failed.");
-        return ENOMEM;
+        retval = ENOMEM;
+        goto errout;
     }
     retval = krb5_c_random_make_octets(context, &otp_challenge.nonce);
-    if(retval != 0) {
+    if (retval != 0) {
         SERVER_DEBUG("krb5_c_random_make_octets failed.");
-        return retval;
+        goto errout;
     }
 
+    //otp_challenge.otp_keyinfo.flags |= fixme->keyinfo_flags;
     otp_challenge.otp_keyinfo.flags = -1;
 
-    retval = encode_krb5_pa_otp_challenge(&otp_challenge, &encoded_otp_challenge);
+#if defined(DEBUG)
+    {
+        char *s = _format_nonce(&otp_challenge.nonce);
+        SERVER_DEBUG("Nonce: [%s]\n", s);
+        free(s);
+    }
+#endif  /* DEBUG */
+
+    /* Create cookie, include nonce.  */
+    /* "[...] the KDC MUST construct the cookie token in such a manner
+       that a malicious client cannot subvert the authentication
+       process by manipulating the token.  The KDC implementation
+       needs to consider expiration of tokens, key rollover, and other
+       security issues in token design." */
+    if (cookie == NULL) {
+        SERVER_DEBUG("No space for a cookie.");
+        retval = EINVAL;
+        goto errout;
+    }
+    cookie->contents = malloc(otp_challenge.nonce.length);
+    if (cookie->contents == NULL) {
+        retval = ENOMEM;
+        goto errout;
+    }
+    cookie->length = otp_challenge.nonce.length;
+    memcpy(cookie->contents, otp_challenge.nonce.data,
+           otp_challenge.nonce.length);
+
+    /* Encode challenge.  */
+    retval = encode_krb5_pa_otp_challenge(&otp_challenge,
+                                          &encoded_otp_challenge);
     if (retval != 0) {
         SERVER_DEBUG("encode_krb5_pa_otp_challenge failed.");
-        return retval;
+        goto errout;
     }
 
     pa_data->pa_type = KRB5_PADATA_OTP_CHALLENGE;
     pa_data->contents = (krb5_octet *) encoded_otp_challenge->data;
     pa_data->length = encoded_otp_challenge->length;
-
     return 0;
+
+ errout:
+    krb5_free_keyblock(context, armor_key);
+    free(otp_challenge.nonce.data);
+    if (cookie != NULL) {
+        free(cookie->contents);
+    }
+    free(cookie);
+    return retval;
 }
 
 static krb5_error_code
@@ -612,6 +680,7 @@ server_verify_preauth(krb5_context context,
                       krb5_kdc_req *request,
                       krb5_enc_tkt_part *enc_tkt_reply,
                       krb5_pa_data *data,
+                      const krb5_pa_data *cookie,
                       preauth_get_entry_data_proc server_get_entry_data,
                       void *pa_module_context,
                       void **pa_request_context,
@@ -632,9 +701,9 @@ server_verify_preauth(krb5_context context,
 
     assert(otp_ctx != NULL);
 
+    /* Decode PA-OTP-REQUEST in pa-data.  */
     encoded_otp_req.length = data->length;
     encoded_otp_req.data = (char *) data->contents;
-
     retval = decode_krb5_pa_otp_req(&encoded_otp_req, &otp_req);
     if (retval != 0) {
         SERVER_DEBUG("Decoding OTP request failed.");
@@ -642,10 +711,11 @@ server_verify_preauth(krb5_context context,
         goto errout;
     }
 
-    /* FIXME: So far I only check if some encryted data is present. To verify it
-     * the nonce must be put into a PA-FX-COOKIE and I don't know how to do it. */
+    /* Decrypt PA-OTP-REQUEST encData containing the server nonce from
+       the KRB-ERROR message in 4-pass mode (PA-OTP-ENC-REQUEST) or a
+       timestamp (PA-ENC-TS-ENC) in 2-pass mode.  */
     if (otp_req->enc_data.ciphertext.data == NULL) {
-        SERVER_DEBUG("Missing encrypted data.");
+        SERVER_DEBUG("Missing PA-OTP-REQUEST encData.");
         retval = KRB5KDC_ERR_PREAUTH_FAILED;
         goto errout;
     }
@@ -653,7 +723,6 @@ server_verify_preauth(krb5_context context,
     decrypted_data.length = otp_req->enc_data.ciphertext.length;
     decrypted_data.data = (char *) malloc(decrypted_data.length);
     if (decrypted_data.data == NULL) {
-        SERVER_DEBUG("malloc failed.");
         retval = ENOMEM;
         goto errout;
     }
@@ -661,19 +730,42 @@ server_verify_preauth(krb5_context context,
     retval = fast_kdc_get_armor_key(context, server_get_entry_data, request,
                                     client, &armor_key);
     if (retval != 0) {
-        krb5_free_keyblock(context, armor_key);
-        retval = EINVAL;
+        SERVER_DEBUG("%s: Unable to get armor key.", __func__);
         goto errout;
     }
 
+    /* FIXME: Find out if encData is nonce or timestamp and decode:
+   PA-OTP-ENC-REQUEST ::= SEQUENCE {
+           nonce     [0] OCTET STRING,
+           ...
+   }
+   PA-ENC-TS-ENC           ::= SEQUENCE {
+           patimestamp     [0] KerberosTime -- client's time --,
+           pausec          [1] Microseconds OPTIONAL
+   }
+    */
     retval = krb5_c_decrypt(context, armor_key, KRB5_KEYUSAGE_PA_OTP_REQUEST,
                             NULL, &otp_req->enc_data, &decrypted_data);
     if (retval != 0) {
-        SERVER_DEBUG("krb5_c_decrypt failed.");
+        SERVER_DEBUG("%s: Unable to decrypt PA-OTP-REQUEST encData.", __func__);
         goto errout;
     }
-    krb5_free_data_contents(context, &decrypted_data);
 
+    /* Verify nonce against cookie in pa-data.  */
+    if (cookie == NULL) {
+        SERVER_DEBUG("Missing cookie.");
+        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        goto errout;
+    }
+    if (decrypted_data.length != cookie->length
+        ||memcmp(decrypted_data.data, cookie->contents, cookie->length)) {
+        SERVER_DEBUG("Bad nonce in request.");
+        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        goto errout;
+    }
+    SERVER_DEBUG("Nonce in PA-OTP-REQUEST matches contents of PA-FX-COOKIE.");
+
+    krb5_free_data_contents(context, &decrypted_data);
     SERVER_DEBUG("OTP (%.*s)", otp_req->otp_value.length,
                  otp_req->otp_value.data);
     otp = strndup(otp_req->otp_value.data, otp_req->otp_value.length);

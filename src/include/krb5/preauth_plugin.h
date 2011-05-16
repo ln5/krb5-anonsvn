@@ -391,7 +391,8 @@ typedef krb5_error_code
                              struct _krb5_db_entry_new *server,
                              preauth_get_entry_data_proc,
                              void *pa_module_context,
-                             krb5_pa_data *data);
+                             krb5_pa_data *data,
+                             krb5_pa_data *cookie);
 
 /* Verify preauthentication data sent by the client, setting the
  * TKT_FLG_PRE_AUTH or TKT_FLG_HW_AUTH flag in the enc_tkt_reply's "flags"
@@ -404,6 +405,7 @@ typedef krb5_error_code
                               krb5_kdc_req *request,
                               krb5_enc_tkt_part *enc_tkt_reply,
                               krb5_pa_data *data,
+                              const krb5_pa_data *cookie,
                               preauth_get_entry_data_proc,
                               void *pa_module_context,
                               void **pa_request_context,
