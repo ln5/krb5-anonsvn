@@ -29,7 +29,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* FAST OTP plugin method for http(s) basic authentication.  */
+/* FAST OTP plugin method for http(s) basic authentication.
+
+   This OTP mechanism uses http(s) to send a user name and an OTP for
+   verification.  If http status code 200 is returned the
+   authentication was successful, otherwise not.
+
+   This OTP mechanism can not generate the OTP or retrieve it from the
+   authentication service.  Therefore the OTP must be sent by the
+   client so we do not set the "must-encrypt-nonce" flag in
+   otp-keyInfo.
+
+   Since we don't share a secret with the client we don't provide
+   KDC-authentication to the client.  This must be provided by some
+   other means (f.ex. host key armor).
+
+ */
 
 #include <string.h>
 #include <errno.h>
