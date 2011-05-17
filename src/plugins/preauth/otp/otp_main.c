@@ -120,6 +120,41 @@ struct otp_method otp_methods[] = {
     {NULL, NULL, 0, NULL, NULL}
 };
 
+/**********/
+/* Util.  */
+/* Return the length of "the longest key length of the symmetric key
+   types that the KDC supports" or 0 on failure.  */
+static size_t
+maxkeylength(krb5_context context)
+{
+    krb5_error_code retval;
+    size_t max;
+    krb5_enctype *enctypes = NULL;
+
+    retval = krb5_get_permitted_enctypes(context, &enctypes);
+    if (retval != 0) {
+        SERVER_DEBUG("krb5_get_permitted_enctypes() fail");
+        return 0;
+    }
+
+    max = 0;
+    while (*enctypes != 0) {
+        size_t keybytes, keylength;
+
+        retval = krb5_c_keylengths(context, *enctypes, &keybytes, &keylength);
+        if (retval != 0) {
+            SERVER_DEBUG("krb5_c_keylengths() fail");
+            return 0;
+        }
+        if (keylength > max) {
+            max = keylength;
+        }
+        enctypes++;
+    }
+
+    return max;
+}
+
 /************/
 /* Client.  */
 #if defined(DEBUG)
@@ -601,13 +636,15 @@ server_get_edata(krb5_context context,
                  otp_ctx->token_id, method_name);
 
     memset(&otp_challenge, 0, sizeof(otp_challenge));
-/* "This nonce string MUST be as long as the longest key length of the
- * symmetric key types that the KDC supports and MUST be chosen randomly."
- *
- * FIXME: how do I find out the length of the longest key? I take 256 bits for
- * a start. */
-    otp_challenge.nonce.length = 32;
-    /* FIXME: Why do we allocate 32+1?  */
+
+    otp_challenge.nonce.length = maxkeylength(context);
+    if (otp_challenge.nonce.length == 0) {
+        SERVER_DEBUG("%s: Unable to find out length of nonce.", __func__);
+        goto errout;
+    }
+    SERVER_DEBUG("Nonce length is %u bits.", 8 * otp_challenge.nonce.length);
+
+    /* FIXME: Why do we allocate an extra octet?  */
     otp_challenge.nonce.data = (char *) malloc(otp_challenge.nonce.length + 1);
     if (otp_challenge.nonce.data == NULL) {
         retval = ENOMEM;
