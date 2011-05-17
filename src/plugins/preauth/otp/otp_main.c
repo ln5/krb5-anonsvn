@@ -124,8 +124,8 @@ struct otp_method otp_methods[] = {
 /* Util.  */
 /* Return the length of "the longest key length of the symmetric key
    types that the KDC supports" or 0 on failure.  */
-static size_t
-maxkeylength(krb5_context context)
+static krb5_error_code
+maxkeylength(krb5_context context, unsigned int *maxp)
 {
     krb5_error_code retval;
     size_t max;
@@ -134,7 +134,7 @@ maxkeylength(krb5_context context)
     retval = krb5_get_permitted_enctypes(context, &enctypes);
     if (retval != 0) {
         SERVER_DEBUG("krb5_get_permitted_enctypes() fail");
-        return 0;
+        return retval;
     }
 
     max = 0;
@@ -144,7 +144,7 @@ maxkeylength(krb5_context context)
         retval = krb5_c_keylengths(context, *enctypes, &keybytes, &keylength);
         if (retval != 0) {
             SERVER_DEBUG("krb5_c_keylengths() fail");
-            return 0;
+            return retval;
         }
         if (keylength > max) {
             max = keylength;
@@ -152,7 +152,8 @@ maxkeylength(krb5_context context)
         enctypes++;
     }
 
-    return max;
+    *maxp = max;
+    return 0;
 }
 
 /************/
@@ -637,8 +638,8 @@ server_get_edata(krb5_context context,
 
     memset(&otp_challenge, 0, sizeof(otp_challenge));
 
-    otp_challenge.nonce.length = maxkeylength(context);
-    if (otp_challenge.nonce.length == 0) {
+    retval = maxkeylength(context, &otp_challenge.nonce.length);
+    if (retval != 0) {
         SERVER_DEBUG("%s: Unable to find out length of nonce.", __func__);
         goto errout;
     }
