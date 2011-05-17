@@ -127,7 +127,7 @@ struct otp_method otp_methods[] = {
 static krb5_error_code
 maxkeylength(krb5_context context, unsigned int *maxp)
 {
-    krb5_error_code retval;
+    krb5_error_code retval = -1;
     size_t max;
     krb5_enctype *enctypes = NULL;
 
@@ -254,7 +254,7 @@ process_preauth(krb5_context context, void *plugin_context,
                 krb5_data *salt, krb5_data *s2kparams, krb5_keyblock *as_key,
                 krb5_pa_data ***out_padata)
 {
-    krb5_error_code retval = 0;
+    krb5_error_code retval = -1;
     krb5_keyblock *armor_key = NULL;
     krb5_pa_data *pa = NULL;
     krb5_pa_data **pa_array = NULL;
@@ -363,7 +363,8 @@ process_preauth(krb5_context context, void *plugin_context,
         *out_padata = pa_array;
     } else {
         CLIENT_DEBUG("Unexpected PA data.\n");
-        return EINVAL;
+        retval = EINVAL;
+        goto errout;
     }
 
     CLIENT_DEBUG("Successfully processed PA data.\n");
@@ -391,7 +392,7 @@ get_config(struct otp_server_ctx *otp_ctx,
            const char *str)
 {
     krb5_context k5_ctx = NULL;
-    krb5_error_code retval = 0;
+    krb5_error_code retval = -1;
     char *result = NULL;
     const char *realm = realm_in;
     assert(otp_ctx != NULL);
@@ -502,7 +503,7 @@ server_init(krb5_context krb5_ctx,
             const char** realmnames)
 {
     struct otp_server_ctx *ctx = NULL;
-    krb5_error_code retval = 0;
+    krb5_error_code retval = -1;
 
     assert(pa_module_context != NULL);
 
@@ -522,7 +523,7 @@ server_init(krb5_context krb5_ctx,
     return 0;
 
  errout:
-    free (ctx);
+    free(ctx);
     return retval;
 }
 
@@ -564,7 +565,7 @@ server_get_edata(krb5_context context,
                  krb5_pa_data *pa_data,
                  krb5_pa_data *cookie)
 {
-    krb5_error_code retval = 0;
+    krb5_error_code retval = -1;
     krb5_keyblock *armor_key = NULL;
     krb5_pa_otp_challenge otp_challenge;
     krb5_data *encoded_otp_challenge = NULL;
@@ -723,7 +724,7 @@ server_verify_preauth(krb5_context context,
                       krb5_authdata ***authz_data)
 {
     krb5_pa_otp_req *otp_req = NULL;
-    krb5_error_code retval = 0;
+    krb5_error_code retval = -1;
     krb5_data encoded_otp_req;
     char *otp = NULL;
     int ret;
@@ -883,7 +884,7 @@ server_return(krb5_context kcontext,
               void **pa_request_context)
 {
     krb5_keyblock *reply_key = NULL;
-    krb5_error_code retval;
+    krb5_error_code retval = -1;
 
     if (pa_request_context == NULL || *pa_request_context == NULL) {
         SERVER_DEBUG("Not handled by me.");
