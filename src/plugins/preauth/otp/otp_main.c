@@ -643,9 +643,7 @@ server_get_edata(krb5_context context,
         goto errout;
     }
     SERVER_DEBUG("Nonce length is %u bits.", 8 * otp_challenge.nonce.length);
-
-    /* FIXME: Why do we allocate an extra octet?  */
-    otp_challenge.nonce.data = (char *) malloc(otp_challenge.nonce.length + 1);
+    otp_challenge.nonce.data = (char *) malloc(otp_challenge.nonce.length);
     if (otp_challenge.nonce.data == NULL) {
         retval = ENOMEM;
         goto errout;
