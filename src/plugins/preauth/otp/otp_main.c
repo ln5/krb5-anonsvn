@@ -704,7 +704,6 @@ server_get_edata(krb5_context context,
     if (cookie != NULL) {
         free(cookie->contents);
     }
-    free(cookie);
     return retval;
 }
 
