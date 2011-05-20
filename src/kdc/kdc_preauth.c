@@ -964,12 +964,14 @@ get_preauth_hint_list(krb5_kdc_req *request, krb5_db_entry *client,
                 /* just failed on this type, continue */
                 free(*pa);
                 *pa = 0;
-                cookie->length = 0;
+                if (cookie != NULL) {
+                    cookie->length = 0;
+                }
                 continue;
             }
             /* This is a hack.  Only one -- the first -- preauth
                system can set the cookie.  */
-            if (cookie->length) {
+            if (cookie != NULL && cookie->length > 0) {
                 *++pa = cookie;
                 cookie = NULL;
             }
