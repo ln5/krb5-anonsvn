@@ -29,23 +29,35 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* FAST OTP plugin method for (legacy) Yubikey OTP validation.  */
+/* FAST OTP plugin method for (legacy) Yubikey OTP validation.
+
+   This OTP method uses libykclient to validate the OTP with a
+   Yubikey validation service.
+
+   KRB5_TL_OTP_BLOB (a.k.a. the binary blob) is on the form
+
+     <api-key>
+
+   where api-key is an unsigned integer (four octets in network byte
+   order) containing the API key to be sent to the Yubikey validation
+   service (called `client_id' in the API).  */
 
 #include <stdlib.h>
 #include <errno.h>
 #include <assert.h>
+#include <arpa/inet.h>          /* For ntohl().  */
 #include <ykclient.h>
 
 #include "otp.h"
 #include "m_ykclient.h"
 
 #define YUBIKEY_URL_TEMPLATE "otp_ykclient_url_template"
-#define YUBIKEY_CLIENT_ID "otp_ykclient_client_id"
 
 #define YUBIKEY_ID_LENGTH 12
 #define YUBIKEY_TOKEN_LENGTH 44
 
 struct otp_ykclient_ctx {
+    struct otp_server_ctx *otp_context;
     ykclient_t *yk_ctx;
     char *url_template;
 };
@@ -65,6 +77,7 @@ verify_otp(const struct otp_server_ctx *otp_ctx, const char *pw)
 {
     struct otp_ykclient_ctx *ctx = OTP_METHOD_CONTEXT(otp_ctx);
     int ret = -1;
+    uint32_t client_id = 0;
     assert(otp_ctx != NULL);
 
     if (pw == NULL) {
@@ -72,12 +85,31 @@ verify_otp(const struct otp_server_ctx *otp_ctx, const char *pw)
         return EINVAL;
     }
 
-    /* TODO: Use blob in ctx->otp_context->blob to get hold of
-       whatever is needed for doing the ykclient request.  */
+    /* What's called client_id in the ykclient API is the "API Key
+       ID".  Using YubiServe, this is what's set with the `-aa' option
+       to dbconf.py.  */
+    if (ctx->otp_context->blob == NULL) {
+        SERVER_DEBUG("[ykclient] Binary blob is missing.");
+        return EINVAL;
+    }
+    if (ctx->otp_context->blobsize != 4) {
+        SERVER_DEBUG("[ykclient] Binary blob is of the wrong size.");
+        return EINVAL;
+    }
+    client_id = htonl(*((uint32_t *) ctx->otp_context->blob));
+
+    /* Setting key (third and fourth arguments) adds "&h=<signature>"
+       to url.  We don't support that at the moment.  */
+    ykclient_set_client(ctx->yk_ctx, client_id, 0, NULL);
 
     ret = ykclient_request (ctx->yk_ctx, pw);
     if (ret == YKCLIENT_OK) {
+        SERVER_DEBUG("[ykclient] Successful validation.");
         ret = 0;
+    }
+    else {
+        SERVER_DEBUG("[ykclient] Validation failing with [%s] (%d).",
+                     ykclient_strerror(ret), ret);
     }
 
     return ret;
@@ -93,14 +125,14 @@ otp_ykclient_server_init(struct otp_server_ctx *otp_ctx,
     int retval = -1;
     struct otp_ykclient_ctx *ctx = NULL;
     struct otp_method_ftable *ft = NULL;
-    char *client_id_str = NULL;
-    int client_id = 0;
 
     ctx = calloc(1, sizeof(*ctx));
     if (ctx == NULL) {
         retval = ENOMEM;
         goto errout;
     }
+    ctx->otp_context = otp_ctx;
+
     ft = calloc(1, sizeof(*ft));
     if (ft == NULL) {
         retval = ENOMEM;
@@ -127,28 +159,6 @@ otp_ykclient_server_init(struct otp_server_ctx *otp_ctx,
     else {
         SERVER_DEBUG("[ykclient] Failed to retrive URL template.");
         retval = ENOENT;
-        goto errout;
-    }
-
-    /* Set client id.  We probably want to move this to verify_otp()
-       where the binary blob is available.  */
-    client_id_str = get_config(otp_ctx, NULL, YUBIKEY_CLIENT_ID);
-    if (client_id_str != NULL) {
-        errno = 0;
-        client_id = (int) strtol(client_id_str, NULL, 0);
-        free(client_id_str);
-        if (errno != 0) {
-            client_id = 0;
-        }
-    }
-    if (client_id != 0) {
-        /* TODO: Set key too.  */
-        ykclient_set_client(ctx->yk_ctx, client_id, 0, NULL);
-    }
-    else {
-        SERVER_DEBUG("[ykclient] Invalid client id in config: [%s]\n",
-                     client_id_str);
-        retval = EINVAL;
         goto errout;
     }
 
