@@ -35,16 +35,22 @@
    verification.  If http status code 200 is returned the
    authentication was successful, otherwise not.
 
-   This OTP mechanism can not generate the OTP or retrieve it from the
-   authentication service.  Therefore the OTP must be sent by the
-   client so we do not set the "must-encrypt-nonce" flag in
+   The KDC can not generate the OTP or retrieve it from the
+   authentication service.  Therefore the OTP must be sent to the KDC
+   by the client and the client and the KDC doesn't share share a
+   secret.  Hence, we do not set the "must-encrypt-nonce" flag in
    otp-keyInfo.
 
-   Since we don't share a secret with the client we don't provide
-   KDC-authentication to the client.  This must be provided by some
-   other means (f.ex. host key armor).
+   Since the KDC doesn't share a secret with the client we don't
+   provide KDC-authentication.  This must be provided through some
+   other mechanism, f.ex. host key armor.
 
- */
+   The binary blob expected is on the form
+
+     <username>
+
+   where username is a NULL terminated string containing the username
+   to be used for the http(s) basic authentication.  */
 
 #include <string.h>
 #include <errno.h>
