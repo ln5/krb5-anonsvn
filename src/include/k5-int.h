@@ -954,6 +954,42 @@ krb5int_find_pa_data(krb5_context, krb5_pa_data *const *, krb5_preauthtype);
 
 void krb5_free_etype_info(krb5_context, krb5_etype_info);
 
+typedef struct _krb5_otp_keyinfo {
+    krb5_int32 flags;
+    krb5_data otp_vendor;
+    krb5_data otp_challenge;
+    krb5_int32 otp_length;
+    krb5_data otp_keyid;
+    krb5_data otp_algid;
+    krb5_algorithm_identifier hash_alg;
+    krb5_int32 iteration_count;
+} krb5_otp_keyinfo;
+
+typedef struct _krb5_pa_otp_challenge {
+    krb5_data nonce;
+    krb5_data otp_service;
+    krb5_otp_keyinfo otp_keyinfo;
+    krb5_int32 n_otp_keyinfo;
+    krb5_data salt;
+    krb5_data s2kparams;
+} krb5_pa_otp_challenge;
+
+typedef struct _krb5_pa_otp_req {
+    krb5_int32 flags;
+    krb5_data nonce;
+    krb5_enc_data enc_data;
+    krb5_algorithm_identifier hash_alg;
+    krb5_int32 iteration_count;
+    krb5_data otp_value;
+    krb5_data otp_challenge;
+    krb5_data otp_counter;
+    krb5_int32 otp_format;
+    krb5_timestamp otp_time;
+    krb5_data otp_keyid;
+    krb5_data otp_algid;
+    krb5_data otp_vendor;
+} krb5_pa_otp_req;
+
 /*
  * Preauthentication property flags
  */
@@ -1758,6 +1794,15 @@ encode_krb5_ad_signedpath(const krb5_ad_signedpath *, krb5_data **);
 krb5_error_code
 encode_krb5_ad_signedpath_data(const krb5_ad_signedpath_data *, krb5_data **);
 
+krb5_error_code
+encode_krb5_otp_keyinfo(const krb5_otp_keyinfo *, krb5_data **);
+
+krb5_error_code
+encode_krb5_pa_otp_challenge(const krb5_pa_otp_challenge *, krb5_data **);
+
+krb5_error_code
+encode_krb5_pa_otp_req(const krb5_pa_otp_req *, krb5_data **);
+
 /*************************************************************************
  * End of prototypes for krb5_encode.c
  *************************************************************************/
@@ -1949,6 +1994,12 @@ decode_krb5_iakerb_header(const krb5_data *, krb5_iakerb_header **);
 
 krb5_error_code
 decode_krb5_iakerb_finished(const krb5_data *, krb5_iakerb_finished **);
+
+krb5_error_code
+decode_krb5_pa_otp_challenge(const krb5_data*, krb5_pa_otp_challenge **);
+
+krb5_error_code
+decode_krb5_pa_otp_req(const krb5_data*, krb5_pa_otp_req **);
 
 struct _krb5_key_data;          /* kdb.h */
 

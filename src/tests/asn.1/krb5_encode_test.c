@@ -798,6 +798,14 @@ main(argc, argv)
         ktest_empty_ldap_seqof_key_data(test_context, &skd);
     }
 #endif
+    /****************************************************************/
+    /* encode_krb5_pa_otp_req */
+    {
+        krb5_pa_otp_req otp;
+        setup(otp,krb5_pa_otp_req,"pa_otp_req",ktest_make_sample_pa_otp_req);
+        encode_run(otp,krb5_pa_otp_req,"pa_otp_req","",encode_krb5_pa_otp_req);
+        ktest_empty_pa_otp_req(&otp);
+    }
 
     krb5_free_context(test_context);
     exit(error_count);

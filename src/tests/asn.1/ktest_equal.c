@@ -687,6 +687,19 @@ int ktest_equal_ldap_sequence_of_keys(ref, var)
 }
 #endif
 
+int ktest_equal_pa_otp_req(ref, var)
+    krb5_pa_otp_req* ref;
+    krb5_pa_otp_req* var;
+{
+    int p = TRUE;
+    if (ref == var) return TRUE;
+    else if (ref == NULL || var == NULL) return FALSE;
+    p=p&&scalar_equal(flags);
+    p=p&&ktest_equal_data(&ref->otp_value,&var->otp_value);
+    return p;
+}
+
+
 /**** arrays ****************************************************************/
 
 int ktest_equal_array_of_data(length, ref, var)

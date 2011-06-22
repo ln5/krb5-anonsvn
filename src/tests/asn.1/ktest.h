@@ -136,6 +136,7 @@ krb5_error_code ktest_make_sample_ad_signedpath_data(krb5_ad_signedpath_data *p)
 krb5_error_code ktest_make_sample_ad_signedpath(krb5_ad_signedpath *p);
 krb5_error_code ktest_make_sample_iakerb_header(krb5_iakerb_header *p);
 krb5_error_code ktest_make_sample_iakerb_finished(krb5_iakerb_finished *p);
+krb5_error_code ktest_make_sample_pa_otp_req(krb5_pa_otp_req *p);
 
 #ifdef ENABLE_LDAP
 krb5_error_code ktest_make_sample_ldap_seqof_key_data(ldap_seqof_key_data * p);
@@ -250,6 +251,8 @@ void ktest_empty_ad_signedpath_data(krb5_ad_signedpath_data *p);
 void ktest_empty_ad_signedpath(krb5_ad_signedpath *p);
 void ktest_empty_iakerb_header(krb5_iakerb_header *p);
 void ktest_empty_iakerb_finished(krb5_iakerb_finished *p);
+void ktest_empty_pa_otp_req(krb5_pa_otp_req *p);
+void ktest_empty_pa_otp_req_with_ctx(krb5_context ctx, krb5_pa_otp_req *p);
 
 #ifdef ENABLE_LDAP
 void ktest_empty_ldap_seqof_key_data(krb5_context, ldap_seqof_key_data *p);
