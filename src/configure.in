@@ -1084,6 +1084,18 @@ AC_CHECK_LIB(aceclnt, sd_init, [
 AC_SUBST(sam2_plugin)
 CFLAGS=$old_CFLAGS
 
+# This check is for plugins/preauth/otp.
+AC_CHECK_LIB(curl, curl_global_init,
+  	     [otp_preauth_plugin=plugins/preauth/otp], [otp_preauth_plugin=])
+AC_CHECK_LIB(ykclient, ykclient_init,
+             [otp_preauth_plugin=plugins/preauth/otp], [otp_preauth_plugin=])
+if test -n "$otp_preauth_plugin"; then
+  AC_MSG_NOTICE([Found all dependencies for OTP preauth plugin, enabling.])
+else
+  AC_MSG_NOTICE([All dependencies not found for OTP preauth plugin, disabling.])
+fi
+AC_SUBST(otp_preauth_plugin)
+
 # This checks is for plugins/locate/python, which isn't built by
 # default, so it's not a big deal that it isn't very good.  We should
 # use python-config instead.
