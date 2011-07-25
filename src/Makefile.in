@@ -15,7 +15,6 @@ SUBDIRS=util include lib \
 	plugins/preauth/pkinit \
 	plugins/preauth/encrypted_challenge \
 	@otp_preauth_plugin@ \
-	plugins/preauth/otp \
 	kdc kadmin slave clients appl tests \
 	config-files gen-manpages po
 WINSUBDIRS=include util lib ccapi windows clients appl
