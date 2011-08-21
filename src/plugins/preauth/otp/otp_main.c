@@ -129,45 +129,6 @@ struct otp_method otp_methods[] = {
 };
 
 
-/**********/
-/* Util.  */
-
-/* Set *OUT_MAXLENGTH to the length of "the longest key length of the
-   symmetric key types that the KDC supports".  Return 0 on
-   success.  */
-static krb5_error_code
-maxkeylength(krb5_context context, unsigned int *out_maxlength)
-{
-    krb5_error_code retval = -1;
-    krb5_enctype *enctypes = NULL;
-    size_t max;
-
-    retval = krb5_get_permitted_enctypes(context, &enctypes);
-    if (retval != 0) {
-        SERVER_DEBUG("krb5_get_permitted_enctypes() fail");
-        return retval;
-    }
-
-    max = 0;
-    while (*enctypes != 0) {
-        size_t keybytes, keylength;
-
-        retval = krb5_c_keylengths(context, *enctypes, &keybytes, &keylength);
-        if (retval != 0) {
-            SERVER_DEBUG("krb5_c_keylengths() fail");
-            return retval;
-        }
-        if (keylength > max) {
-            max = keylength;
-        }
-        enctypes++;
-    }
-
-    *out_maxlength = max;
-    return 0;
-}
-
-
 /************/
 /* Client.  */
 static krb5_preauthtype otp_client_supported_pa_types[] = {
@@ -598,6 +559,8 @@ otp_server_get_edata(krb5_context context,
     char *method_name = NULL;
     char *token_id = NULL;
     int f;
+    krb5_timestamp now_sec;
+    krb5_int32 now_usec;
 
     assert(otp_ctx != NULL);
     memset(&otp_challenge, 0, sizeof(otp_challenge));
@@ -662,12 +625,11 @@ otp_server_get_edata(krb5_context context,
     SERVER_DEBUG("Token id [%s] found, method [%s].", otp_ctx->token_id,
                  method_name);
 
-    /* Create nonce.  */
-    retval = maxkeylength(context, &otp_challenge.nonce.length);
-    if (retval != 0) {
-        SERVER_DEBUG("Unable to find out how long the nonce should be.");
-        goto errout;
-    }
+    /* Create nonce from random data + timestamp.  Length of random
+       data equals the length of the server key.  The timestamp is 4
+       octets current time, seconds since the epoch and 4 bytes
+       microseconds, both encoded in network byte order.  */
+    otp_challenge.nonce.length = armor_key->length + 8;
     otp_challenge.nonce.data = (char *) malloc(otp_challenge.nonce.length);
     if (otp_challenge.nonce.data == NULL) {
         retval = ENOMEM;
@@ -675,15 +637,21 @@ otp_server_get_edata(krb5_context context,
     }
     retval = krb5_c_random_make_octets(context, &otp_challenge.nonce);
     if (retval != 0) {
-        SERVER_DEBUG("Unable to create nonce.");
+        SERVER_DEBUG("Unable to create random data for nonce.");
         goto errout;
     }
+    if (krb5_us_timeofday(context, &now_sec, &now_usec) != 0) {
+        SERVER_DEBUG("Unable to get current time.");
+        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        goto errout;
+    }
+    *((uint32_t *) (otp_challenge.nonce.data + armor_key->length)) =
+        htonl(now_sec);
+    *((uint32_t *) (otp_challenge.nonce.data + armor_key->length + 4)) =
+        htonl(now_usec);
 
     /* otp_challenge.otp_keyinfo.flags |= FIXME->keyinfo_flags; */
     otp_challenge.otp_keyinfo.flags = -1;
-
-    /* TODO: Store nonce in some global and persistent storage and put
-       a handle to this in a PA-FX-COOKIE.  */
 
     /* Encode challenge.  */
     retval = encode_krb5_pa_otp_challenge(&otp_challenge,
@@ -717,7 +685,7 @@ otp_server_verify(krb5_context context,
                   krb5_authdata ***authz_data)
 {
     krb5_pa_otp_req *otp_req = NULL;
-    krb5_error_code retval = 0;
+    krb5_error_code retval = KRB5KDC_ERR_PREAUTH_FAILED;
     krb5_data encoded_otp_req;
     char *otp = NULL;
     int ret;
@@ -727,6 +695,8 @@ otp_server_verify(krb5_context context,
     krb5_tl_data *tl_data;
     char *blob = NULL;
     int f;
+    krb5_timestamp now_sec, ts_sec;
+    krb5_int32 now_usec, ts_usec;
 
     assert(otp_ctx != NULL);
 
@@ -740,11 +710,8 @@ otp_server_verify(krb5_context context,
         goto errout;
     }
 
-    /* TODO: So far we only check if some encryted data is present. To
-       verify it, find a handle to global storage of the correct nonce
-       in the PA-FX-COOKIE.  */
     if (otp_req->enc_data.ciphertext.data == NULL) {
-        SERVER_DEBUG("Missing encrypted data.");
+        SERVER_DEBUG("Missing encData in PA-OTP-REQUEST.");
         retval = KRB5KDC_ERR_PREAUTH_FAILED;
         goto errout;
     }
@@ -768,7 +735,30 @@ otp_server_verify(krb5_context context,
     retval = krb5_c_decrypt(context, armor_key, KRB5_KEYUSAGE_PA_OTP_REQUEST,
                             NULL, &otp_req->enc_data, &decrypted_data);
     if (retval != 0) {
-        SERVER_DEBUG("krb5_c_decrypt failed.");
+        SERVER_DEBUG("Unable to decrypt encData in PA-OTP-REQUEST.");
+        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        goto errout;
+    }
+
+    /* Verify the server nonce (PA-OTP-ENC-REQUEST).  */
+    if (decrypted_data.length != 8 + armor_key->length) {
+        SERVER_DEBUG("Invalid server nonce length.");
+        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        goto errout;
+    }
+    if (krb5_us_timeofday(context, &now_sec, &now_usec)) {
+        SERVER_DEBUG("Unable to get current time.");
+        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        goto errout;
+    }
+    ts_sec = ntohl(*((uint32_t *) (decrypted_data.data + armor_key->length)));
+    ts_usec = ntohl(*((uint32_t *) (decrypted_data.data + armor_key->length + 4)));
+    if (labs(now_sec - ts_sec) > context->clockskew
+        || (labs(now_sec - ts_sec) == context->clockskew
+            && ((now_sec > ts_sec && now_usec > ts_usec)
+                || (now_sec < ts_sec && now_usec < ts_usec)))) {
+        SERVER_DEBUG("Bad timestamp in PA-OTP-ENC-REQUEST.");
+        retval = KRB5KDC_ERR_PREAUTH_FAILED; /* FIXME: KRB_APP_ERR_SKEW?  */
         goto errout;
     }
     krb5_free_data_contents(context, &decrypted_data);
