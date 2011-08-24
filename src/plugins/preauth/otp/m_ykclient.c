@@ -58,7 +58,7 @@ server_fini(void *method_context)
 }
 
 static int
-verify_otp(const struct otp_server_ctx *otp_ctx, const char *pw)
+verify_otp(const struct otp_req_ctx *otp_ctx, const char *pw)
 {
     struct otp_ykclient_ctx *ctx = OTP_METHOD_CONTEXT(otp_ctx);
     int ret = -1;
