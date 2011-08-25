@@ -467,18 +467,21 @@ static void
 server_init_methods(struct otp_server_ctx *ctx)
 {
     int f;
+    int err;
 
     for (f = 0; otp_methods[f].name != NULL; f++) {
         struct otp_method *m = &otp_methods[f];
-        if (m->init(ctx,
-                    get_config,
-                    search_db_type,
-                    &m->ftable,
-                    &m->context) == 0) {
+        err = m->init(ctx,
+                      get_config,
+                      search_db_type,
+                      &m->ftable,
+                      &m->context);
+        if (err == 0) {
             m->enabled_flag = 1;
         }
         else {
-            SERVER_DEBUG("Failing init for method [%s].", m->name);
+            SERVER_DEBUG("Failing init for method [%s], error %d.", m->name,
+                         err);
         }
     }
 }
@@ -615,7 +618,7 @@ otp_server_get_edata(krb5_context context,
         }
     }
 
-    if (otp_ctx->method == NULL) {
+    if (otp_ctx->method == NULL || !otp_ctx->method->enabled_flag) {
         SERVER_DEBUG("Authentication method %s not configured.", method_name);
         retval = ENOENT;
         goto errout;
