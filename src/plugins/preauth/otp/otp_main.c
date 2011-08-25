@@ -879,8 +879,6 @@ kdcpreauth_otp_initvt(krb5_context context, int maj_ver, int min_ver,
 {
     krb5_kdcpreauth_vtable vt;
 
-    SERVER_DEBUG(" *** %s: enter", __func__);
-
     if (maj_ver != 1) {
         return KRB5_PLUGIN_VER_NOTSUPP;
     }
