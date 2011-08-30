@@ -1,0 +1,9 @@
+# t_otp.http_ykclient -- http server script for testing the ykclient OTP method.
+#
+# This file is fed to http-server.py which serves the following
+# replies in order, repeating the last reply when it runs out of
+# replies.  Replies are separated by an empty line.
+status=OK
+
+status=NO_AUTH
+
