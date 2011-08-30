@@ -101,6 +101,14 @@ struct otp_client_ctx {
     char *otp;
 };
 
+struct otp_server_ctx {
+#ifdef DEBUG
+#define MAGIC_OTP_SERVER_CTX 0xbeef4711
+    unsigned int magic;
+#endif
+    krb5_context krb5_context;
+};
+
 struct otp_req_ctx {
     struct otp_server_ctx* server_ctx;
     char *token_id;
@@ -110,12 +118,4 @@ struct otp_req_ctx {
     krb5_db_entry *client;
     /** Authentication method currently in use.  */
     struct otp_method *method;
-};
-
-struct otp_server_ctx {
-#ifdef DEBUG
-#define MAGIC_OTP_SERVER_CTX 0xbeef4711
-    unsigned int magic;
-#endif
-    krb5_context krb5_context;
 };
