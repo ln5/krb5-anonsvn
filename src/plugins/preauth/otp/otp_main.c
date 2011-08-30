@@ -456,11 +456,11 @@ otp_server_create_req_ctx(struct otp_server_ctx *ctx,
     (*request)->token_id = token_id;
     SERVER_DEBUG("Token id [%s] found, method [%s].", (*request)->token_id,
                  method_name);
-    /* will be freed in otp_server_free_req_ctx */
+    /* token_id will be freed in otp_server_free_req_ctx().  */
     token_id = NULL;
     method_name = NULL;
 
-    /* find blob mactching token_id */
+    /* Find blob matching the token_id.  */
     tl_data = client->tl_data;
     while (tl_data != NULL) {
         int found_flag = 0;
@@ -507,6 +507,7 @@ otp_server_create_req_ctx(struct otp_server_ctx *ctx,
         free(blob);
     if (token_id != NULL)
         free(token_id);
+
     return retval;
 }
 
