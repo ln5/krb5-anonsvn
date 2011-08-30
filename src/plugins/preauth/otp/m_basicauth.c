@@ -75,7 +75,7 @@ curl_wfunc(void *ptr, size_t size, size_t nmemb, void *stream)
 #endif  /* !DEBUG */
 
 static int
-verify_otp(const struct otp_req_ctx *otp_ctx, const char *pw)
+verify_otp(const struct otp_req_ctx *req_ctx, const char *pw)
 {
     struct otp_basicauth_ctx *ctx = NULL;
     char *username = NULL;
@@ -85,7 +85,7 @@ verify_otp(const struct otp_req_ctx *otp_ctx, const char *pw)
     char curl_errbuf[CURL_ERROR_SIZE];
 #endif
 
-    ctx = OTP_METHOD_CONTEXT(otp_ctx);
+    ctx = OTP_METHOD_CONTEXT(req_ctx);
     assert(ctx != NULL);
 #ifdef DEBUG
     assert(ctx->magic == MAGIC_OTP_BASICAUTH_CTX);
@@ -97,16 +97,16 @@ verify_otp(const struct otp_req_ctx *otp_ctx, const char *pw)
     }
 
     /* Blob contains username.  */
-    if (otp_ctx->blob == NULL) {
+    if (req_ctx->blob == NULL) {
         SERVER_DEBUG("[basicauth] Binary blob is missing.");
         return EINVAL;
     }
-    if (otp_ctx->blob[otp_ctx->blobsize] != '\0') {
+    if (req_ctx->blob[req_ctx->blobsize] != '\0') {
         SERVER_DEBUG("[basicauth] Invalid blob of length %lu.",
-                     otp_ctx->blobsize);
+                     req_ctx->blobsize);
         return EINVAL;
     }
-    username = otp_ctx->blob;
+    username = req_ctx->blob;
 
     if (ctx->url == NULL) {
         SERVER_DEBUG("[basicauth] Missing otp_url_template in krb5.conf.");
