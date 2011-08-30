@@ -45,6 +45,7 @@
 struct otp_method_ftable;
 struct otp_tlv;
 struct otp_server_ctx;
+struct otp_req_ctx;
 
 /** Function for searching the kdb.
     FIXME: Remove?  OTP methods should probably use the binary blob
@@ -66,12 +67,12 @@ typedef int (*otp_server_init_func_t)(struct otp_server_ctx *context,
                                       search_db_func_t search_db,
                                       struct otp_method_ftable **ftable,
                                       void **method_context);
-/* Function for cleaning an OTP method.  Invoked when the OTP plugin
-   is unloaded.  */
+/* Function for cleaning up after an OTP method.  Invoked when the OTP
+   plugin is unloaded.  */
 typedef void (*otp_server_fini_func_t)(void *method_context);
 
 /** Function for verifying an OTP.  Returns 0 on successful verification.  */
-typedef int (*otp_server_verify_func_t)(const struct otp_server_ctx *ctx,
+typedef int (*otp_server_verify_func_t)(const struct otp_req_ctx *req_ctx,
                                         const char *pw);
 
 
@@ -106,6 +107,10 @@ struct otp_server_ctx {
     unsigned int magic;
 #endif
     krb5_context krb5_context;
+};
+
+struct otp_req_ctx {
+    struct otp_server_ctx* server_ctx;
     char *token_id;
     char *blob;
     size_t blobsize;

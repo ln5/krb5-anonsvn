@@ -58,11 +58,11 @@ server_fini(void *method_context)
 }
 
 static int
-verify_otp(const struct otp_server_ctx *otp_ctx, const char *pw)
+verify_otp(const struct otp_req_ctx *req_ctx, const char *pw)
 {
-    struct otp_ykclient_ctx *ctx = OTP_METHOD_CONTEXT(otp_ctx);
+    struct otp_ykclient_ctx *ctx = OTP_METHOD_CONTEXT(req_ctx);
     int ret = -1;
-    assert(otp_ctx != NULL);
+    assert(ctx != NULL);
 
     if (pw == NULL) {
         SERVER_DEBUG("[ykclient] OTP is missing.");
