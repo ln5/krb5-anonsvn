@@ -372,19 +372,16 @@ otp_server_get_flags(krb5_context kcontext, krb5_preauthtype pa_type)
 }
 
 
-/* Frees the request context. */
-static int
+/* Free a request context. */
+static void
 otp_server_free_req_ctx(struct otp_req_ctx **request)
 {
     if (*request == NULL)
-        return 0;
-    if ((*request)->token_id != NULL)
-        free((*request)->token_id);
-    if ((*request)->blob != NULL)
-        free((*request)->blob);
+        return;
+    free((*request)->token_id);
+    free((*request)->blob);
     free(*request);
     *request = NULL;
-    return 0;
 }
 
 /* Create a request context with the client, blob, token and method, to use in
