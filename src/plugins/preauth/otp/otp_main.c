@@ -694,7 +694,6 @@ otp_server_get_edata(krb5_context context,
     krb5_pa_otp_challenge otp_challenge;
     krb5_data *encoded_otp_challenge = NULL;
     struct otp_server_ctx *otp_ctx = (struct otp_server_ctx *) moddata;
-    struct otp_req_ctx *otp_req = NULL;
     krb5_timestamp now_sec;
     krb5_int32 now_usec;
 
@@ -706,11 +705,6 @@ otp_server_get_edata(krb5_context context,
     if (retval != 0 || armor_key == NULL) {
         SERVER_DEBUG("No armor key found.");
         retval = EINVAL;
-        goto errout;
-    }
-
-    retval = otp_server_create_req_ctx(otp_ctx, client, &otp_req);
-    if (retval != 0) {
         goto errout;
     }
 
@@ -758,7 +752,6 @@ otp_server_get_edata(krb5_context context,
 
  errout:
     krb5_free_keyblock(context, armor_key);
-    otp_server_free_req_ctx(&otp_req);
     return retval;
 }
 
