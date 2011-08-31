@@ -161,6 +161,9 @@ profile_get_values(profile_t profile, const char *const *names,
     char                    *value;
     struct profile_string_list values;
 
+    *ret_values = NULL;
+    if (!profile)
+        return PROF_NO_PROFILE;
     if (profile->vt)
         return get_values_vt(profile, names, ret_values);
 
@@ -222,6 +225,8 @@ errcode_t profile_get_value(profile_t profile, const char **names,
     char                    *value;
 
     *ret_value = NULL;
+    if (!profile)
+        return PROF_NO_PROFILE;
     if (profile->vt)
         return get_value_vt(profile, names, ret_value);
 
@@ -483,6 +488,9 @@ profile_iterator_create(profile_t profile, const char *const *names, int flags,
     errcode_t retval;
 
     *ret_iter = NULL;
+    if (!profile)
+        return PROF_NO_PROFILE;
+
     iter = malloc(sizeof(*iter));
     if (iter == NULL)
         return ENOMEM;
@@ -536,28 +544,27 @@ static errcode_t
 set_results(const char *name, const char *value, char **ret_name,
             char **ret_value)
 {
-    if (ret_name) {
-        if (name) {
-            *ret_name = strdup(name);
-            if (!*ret_name)
-                return ENOMEM;
-        } else
-            *ret_name = NULL;
+    char *name_copy = NULL, *value_copy = NULL;
+
+    if (ret_name && name) {
+        name_copy = strdup(name);
+        if (name_copy == NULL)
+            goto oom;
     }
-    if (ret_value) {
-        if (value) {
-            *ret_value = strdup(value);
-            if (!*ret_value) {
-                if (ret_name) {
-                    free(*ret_name);
-                    *ret_name = NULL;
-                }
-                return ENOMEM;
-            }
-        } else
-            *ret_value = NULL;
+    if (ret_value && value) {
+        value_copy = strdup(value);
+        if (value_copy == NULL)
+            goto oom;
     }
+    if (ret_name)
+        *ret_name = name_copy;
+    if (ret_value)
+        *ret_value = value_copy;
     return 0;
+oom:
+    free(name_copy);
+    free(value_copy);
+    return ENOMEM;
 }
 
 errcode_t KRB5_CALLCONV
@@ -568,6 +575,10 @@ profile_iterator(void **iter_p, char **ret_name, char **ret_value)
     struct profile_iterator *iter = *iter_p;
     profile_t profile;
 
+    if (ret_name)
+        *ret_name = NULL;
+    if (ret_value)
+        *ret_value = NULL;
     if (iter->magic != PROF_MAGIC_ITERATOR)
         return PROF_MAGIC_ITERATOR;
     profile = iter->profile;

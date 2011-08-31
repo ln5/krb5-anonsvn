@@ -27,7 +27,7 @@
  * $Id$
  */
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_context_time(minor_status, context_handle, time_rec)
     OM_uint32 *minor_status;
     gss_ctx_id_t context_handle;

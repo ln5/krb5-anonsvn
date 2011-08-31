@@ -66,27 +66,38 @@ init_module(struct profile_vtable *vtable, void *cbdata,
 static errcode_t
 parse_modspec(const char *modspec, char **ret_path, char **ret_residual)
 {
-    const char *p, *prefix;
-    char *path, *residual;
+    const char *p;
+    char *path, *fullpath, *residual;
+    errcode_t ret;
 
     *ret_path = *ret_residual = NULL;
 
-    p = strchr(modspec, ':');
+    /* Find the separator, skipping a Windows drive letter if present. */
+    p = (*modspec != '\0' && modspec[1] == ':') ? modspec + 2 : modspec;
+    p = strchr(p, ':');
     if (p == NULL)
         return PROF_MODULE_SYNTAX;
 
-    /* XXX Unix path handling for now. */
-    prefix = (*modspec == '/') ? "" : LIBDIR "/";
-    if (asprintf(&path, "%s%.*s", prefix, (int)(p - modspec), modspec) < 0)
+    /* Copy the path. */
+    path = malloc(p - modspec + 1);
+    if (path == NULL)
         return ENOMEM;
+    memcpy(path, modspec, p - modspec);
+    path[p - modspec] = '\0';
+
+    /* Compose the path with LIBDIR if it's not absolute. */
+    ret = k5_path_join(LIBDIR, path, &fullpath);
+    free(path);
+    if (ret)
+        return ret;
 
     residual = strdup(p + 1);
     if (residual == NULL) {
-        free(path);
+        free(fullpath);
         return ENOMEM;
     }
 
-    *ret_path = path;
+    *ret_path = fullpath;
     *ret_residual = residual;
     return 0;
 }
@@ -481,8 +492,11 @@ profile_abandon(profile_t profile)
             err = k5_mutex_lock(&profile->lib_handle->lock);
             if (!err && --profile->lib_handle->refcount == 0) {
                 krb5int_close_plugin(profile->lib_handle->plugin_handle);
+                k5_mutex_unlock(&profile->lib_handle->lock);
+                k5_mutex_destroy(&profile->lib_handle->lock);
                 free(profile->lib_handle);
-            }
+            } else if (!err)
+                k5_mutex_unlock(&profile->lib_handle->lock);
         }
         free(profile->vt);
     } else {

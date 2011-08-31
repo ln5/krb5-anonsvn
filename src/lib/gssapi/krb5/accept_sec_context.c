@@ -1339,7 +1339,7 @@ krb5_gss_accept_sec_context_ext(
                           delegated_cred_handle, exts);
 }
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_accept_sec_context(minor_status, context_handle,
                             verifier_cred_handle, input_token,
                             input_chan_bindings, src_name, mech_type,

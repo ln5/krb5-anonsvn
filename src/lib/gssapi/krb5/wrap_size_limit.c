@@ -73,7 +73,7 @@
 #include "gssapiP_krb5.h"
 
 /* V2 interface */
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_wrap_size_limit(minor_status, context_handle, conf_req_flag,
                          qop_req, req_output_size, max_input_size)
     OM_uint32           *minor_status;

@@ -196,7 +196,6 @@ typedef INT64_TYPE krb5_int64;
 #define KRB5_CONF_CLOCKSKEW                      "clockskew"
 #define KRB5_CONF_DATABASE_NAME                  "database_name"
 #define KRB5_CONF_DB_MODULE_DIR                  "db_module_dir"
-#define KRB5_CONF_DB_MODULES                     "db_modules"
 #define KRB5_CONF_DEFAULT                        "default"
 #define KRB5_CONF_DEFAULT_REALM                  "default_realm"
 #define KRB5_CONF_DEFAULT_DOMAIN                 "default_domain"
@@ -238,12 +237,13 @@ typedef INT64_TYPE krb5_int64;
 #define KRB5_CONF_KEY_STASH_FILE              "key_stash_file"
 #define KRB5_CONF_KPASSWD_PORT                "kpasswd_port"
 #define KRB5_CONF_KPASSWD_SERVER              "kpasswd_server"
-#define KRB5_CONF_LDAP_KDC_DN                 "ldap_kdc_dn"
-#define KRB5_CONF_LDAP_KADMIN_DN              "ldap_kadmind_dn"
-#define KRB5_CONF_LDAP_SERVICE_PASSWORD_FILE  "ldap_service_password_file"
-#define KRB5_CONF_LDAP_ROOT_CERTIFICATE_FILE  "ldap_root_certificate_file"
-#define KRB5_CONF_LDAP_SERVERS                "ldap_servers"
 #define KRB5_CONF_LDAP_CONNS_PER_SERVER       "ldap_conns_per_server"
+#define KRB5_CONF_LDAP_KADMIN_DN              "ldap_kadmind_dn"
+#define KRB5_CONF_LDAP_KDC_DN                 "ldap_kdc_dn"
+#define KRB5_CONF_LDAP_KERBEROS_CONTAINER_DN  "ldap_kerberos_container_dn"
+#define KRB5_CONF_LDAP_KPASSWDD_DN            "ldap_kpasswdd_dn"
+#define KRB5_CONF_LDAP_SERVERS                "ldap_servers"
+#define KRB5_CONF_LDAP_SERVICE_PASSWORD_FILE  "ldap_service_password_file"
 #define KRB5_CONF_LIBDEFAULTS                 "libdefaults"
 #define KRB5_CONF_LOGGING                     "logging"
 #define KRB5_CONF_MASTER_KEY_NAME             "master_key_name"
@@ -257,7 +257,6 @@ typedef INT64_TYPE krb5_int64;
 #define KRB5_CONF_PERMITTED_ENCTYPES          "permitted_enctypes"
 #define KRB5_CONF_PLUGINS                     "plugins"
 #define KRB5_CONF_PLUGIN_BASE_DIR             "plugin_base_dir"
-#define KRB5_CONF_PREAUTH_MODULE_DIR          "preauth_module_dir"
 #define KRB5_CONF_PREFERRED_PREAUTH_TYPES     "preferred_preauth_types"
 #define KRB5_CONF_PROXIABLE                   "proxiable"
 #define KRB5_CONF_RDNS                        "rdns"
@@ -2145,10 +2144,10 @@ struct srv_dns_entry {
     unsigned short port;
     char *host;
 };
-#ifdef KRB5_DNS_LOOKUP
 
 #define MAX_DNS_NAMELEN (15*(MAXHOSTNAMELEN + 1)+1)
 
+#ifdef KRB5_DNS_LOOKUP
 krb5_error_code
 krb5int_make_srv_query_realm(const krb5_data *realm,
                              const char *service,
@@ -2772,8 +2771,13 @@ krb5int_build_principal_alloc_va(krb5_context context,
 static inline int
 data_eq(krb5_data d1, krb5_data d2)
 {
-    return (d1.length == d2.length
-            && !memcmp(d1.data, d2.data, d1.length));
+    return (d1.length == d2.length && !memcmp(d1.data, d2.data, d1.length));
+}
+
+static inline int
+data_eq_string (krb5_data d, const char *s)
+{
+    return (d.length == strlen(s) && !memcmp(d.data, s, d.length));
 }
 
 static inline krb5_data
@@ -2811,12 +2815,6 @@ alloc_data(krb5_data *data, unsigned int len)
     data->data = ptr;
     data->length = len;
     return 0;
-}
-
-static inline int
-data_eq_string (krb5_data d, char *s)
-{
-    return data_eq(d, string2data(s));
 }
 
 static inline int
