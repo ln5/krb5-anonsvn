@@ -91,7 +91,8 @@ fake-install: runenv.py
 	(w=`pwd`; cd lib && $(MAKE) install DESTDIR="$$w/util/fakedest")
 	(w=`pwd`; cd plugins/kdb/db2 && $(MAKE) install DESTDIR="$$w/util/fakedest")
 	(w=`pwd`; cd plugins/preauth/encrypted_challenge && $(MAKE) install DESTDIR="$$w/util/fakedest")
-#	(w=`pwd`; cd plugins/preauth/otp && $(MAKE) install DESTDIR="$$w/util/fakedest")
+	@if test -n "@otp_preauth_plugin@"; then \
+		(w=`pwd`; cd plugins/preauth/otp && $(MAKE) install DESTDIR="$$w/util/fakedest"); fi
 	if test -r plugins/preauth/pkinit/Makefile; then \
 	  (w=`pwd`; cd plugins/preauth/pkinit && $(MAKE) install DESTDIR="$$w/util/fakedest"); \
 	fi
