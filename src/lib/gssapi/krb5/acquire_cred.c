@@ -726,7 +726,7 @@ gss_krb5int_set_cred_rcache(OM_uint32 *minor_status,
  * desired_mechs and actual_mechs, so we ignore those parameters.
  */
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_acquire_cred(minor_status, desired_name, time_req,
                       desired_mechs, cred_usage, output_cred_handle,
                       actual_mechs, time_rec)
@@ -751,7 +751,7 @@ krb5_gss_acquire_cred(minor_status, desired_name, time_req,
     return acquire_cred(minor_status, &args, output_cred_handle, time_rec);
 }
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 iakerb_gss_acquire_cred(minor_status, desired_name, time_req,
                         desired_mechs, cred_usage, output_cred_handle,
                         actual_mechs, time_rec)
@@ -776,7 +776,7 @@ iakerb_gss_acquire_cred(minor_status, desired_name, time_req,
     return acquire_cred(minor_status, &args, output_cred_handle, time_rec);
 }
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_acquire_cred_with_password(OM_uint32 *minor_status,
                                     const gss_name_t desired_name,
                                     const gss_buffer_t password,
@@ -800,7 +800,7 @@ krb5_gss_acquire_cred_with_password(OM_uint32 *minor_status,
     return acquire_cred(minor_status, &args, output_cred_handle, time_rec);
 }
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 iakerb_gss_acquire_cred_with_password(OM_uint32 *minor_status,
                                       const gss_name_t desired_name,
                                       const gss_buffer_t password,
@@ -834,6 +834,7 @@ gss_krb5int_import_cred(OM_uint32 *minor_status,
     struct acquire_cred_args args;
     krb5_gss_name_rec name;
     OM_uint32 time_rec;
+    krb5_error_code code;
 
     assert(value->length == sizeof(*req));
 
@@ -843,15 +844,6 @@ gss_krb5int_import_cred(OM_uint32 *minor_status,
     req = (struct krb5_gss_import_cred_req *)value->value;
 
     memset(&args, 0, sizeof(args));
-
-    if (req->keytab_principal) {
-        memset(&name, 0, sizeof(name));
-        name.princ = req->keytab_principal;
-        args.desired_name = (gss_name_t)&name;
-    }
-
-    args.ccache = req->id;
-    args.keytab = req->keytab;
 
     if (req->id && req->keytab)
         args.cred_usage = GSS_C_BOTH;
@@ -864,6 +856,23 @@ gss_krb5int_import_cred(OM_uint32 *minor_status,
         return GSS_S_FAILURE;
     }
 
-    return acquire_cred(minor_status, &args, cred_handle, &time_rec);
+    if (req->keytab_principal) {
+        memset(&name, 0, sizeof(name));
+        code = k5_mutex_init(&name.lock);
+        if (code != 0) {
+            *minor_status = code;
+            return GSS_S_FAILURE;
+        }
+        name.princ = req->keytab_principal;
+        args.desired_name = (gss_name_t)&name;
+    }
+
+    args.ccache = req->id;
+    args.keytab = req->keytab;
+
+    code = acquire_cred(minor_status, &args, cred_handle, &time_rec);
+    if (req->keytab_principal)
+        k5_mutex_destroy(&name.lock);
+    return code;
 }
 

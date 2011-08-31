@@ -640,8 +640,10 @@ kg_accept_krb5(minor_status, context_handle,
         }
     }
 
-    if ((code = krb5_rd_req(context, &auth_context, &ap_req, accprinc,
-                            cred->keytab, &ap_req_options, &ticket))) {
+    code = krb5_rd_req(context, &auth_context, &ap_req, accprinc,
+                       cred->keytab, &ap_req_options, &ticket);
+    krb5_free_principal(context, accprinc);
+    if (code) {
         major_status = GSS_S_FAILURE;
         goto fail;
     }
@@ -1337,7 +1339,7 @@ krb5_gss_accept_sec_context_ext(
                           delegated_cred_handle, exts);
 }
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_accept_sec_context(minor_status, context_handle,
                             verifier_cred_handle, input_token,
                             input_chan_bindings, src_name, mech_type,

@@ -39,6 +39,7 @@ krb5_boolean
 k5_get_os_entropy(unsigned char *buf, size_t len)
 {
     krb5_boolean result;
+    HCRYPTPROV provider;
 
     if (!CryptAcquireContext(&provider, NULL, NULL, PROV_RSA_FULL, 0))
         return FALSE;

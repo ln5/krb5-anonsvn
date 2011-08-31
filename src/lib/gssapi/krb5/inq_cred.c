@@ -72,7 +72,7 @@
 
 #include "gssapiP_krb5.h"
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_inquire_cred(minor_status, cred_handle, name, lifetime_ret,
                       cred_usage, mechanisms)
     OM_uint32 *minor_status;
@@ -220,7 +220,7 @@ fail:
 }
 
 /* V2 interface */
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_inquire_cred_by_mech(minor_status, cred_handle,
                               mech_type, name, initiator_lifetime,
                               acceptor_lifetime, cred_usage)

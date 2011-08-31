@@ -490,7 +490,7 @@ kg_seal_iov_length(OM_uint32 *minor_status,
     return GSS_S_COMPLETE;
 }
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_wrap_iov(OM_uint32 *minor_status,
                   gss_ctx_id_t context_handle,
                   int conf_req_flag,
@@ -508,7 +508,7 @@ krb5_gss_wrap_iov(OM_uint32 *minor_status,
     return major_status;
 }
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_wrap_iov_length(OM_uint32 *minor_status,
                          gss_ctx_id_t context_handle,
                          int conf_req_flag,

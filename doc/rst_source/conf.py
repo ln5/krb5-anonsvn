@@ -27,7 +27,10 @@ import sys, os
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 #extensions = ['sphinx.ext.autodoc', 'sphinxcontrib.doxylink']
 extensions = ['sphinx.ext.autodoc']
-
+#extensions = ['sphinx.ext.autodoc', 'sphinxcontrib.doxylink']
+#doxylink = {
+#    'krb5doxy' : ('path-to-doxygen-tag-file/krb5doxy.tag', 'location-of-doxygen-html-output/'),
+#}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -215,6 +218,24 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'krbdoc', u'MIT Kerberos Documentation',
-     [u'MIT'], 1)
+    ('krb_users/user_commands/kinit', 'kinit', u'obtain and cache Kerberos ticket-granting ticket', [u'MIT'], 1),
+    ('krb_users/user_commands/klist', 'klist', u'list cached Kerberos tickets', [u'MIT'], 1),
+    ('krb_users/user_commands/kdestroy', 'kdestroy', u'destroy Kerberos tickets', [u'MIT'], 1),
+    ('krb_users/user_commands/kpasswd', 'kpasswd', u'change a user\'s Kerberos password', [u'MIT'], 1),
+    ('krb_users/user_commands/kvno', 'kvno', u'print key version numbers of Kerberos principals', [u'MIT'], 1),
+    ('krb_users/user_commands/ksu', 'ksu', u'Kerberized super-user', [u'MIT'], 1),
+    ('krb_users/user_commands/k5login', '.k5login', u'Kerberos V5 acl file for host access', [u'MIT'], 5),
+    ('krb_admins/admin_commands/krb5kdc', 'krb5kdc', u'Kerberos V5 KDC', [u'MIT'], 8),
+    ('krb_admins/admin_commands/kadmin_local', 'kadmin.local', u'Kerberos V5 database administration program', [u'MIT'], 8),
+    ('krb_admins/admin_commands/kadmin_local', 'kadmin', u'Kerberos V5 database administration program', [u'MIT'], 1),
+    ('krb_admins/admin_commands/kprop', 'kprop', u'propagate a Kerberos V5 principal database to a slave server', [u'MIT'], 8),
+    ('krb_admins/admin_commands/kproplog', 'kproplog', u'display the contents of the Kerberos principal update log', [u'MIT'], 8),
+    ('krb_admins/admin_commands/kpropd', 'kpropd', u'Kerberos V5 slave KDC update server', [u'MIT'], 8),
+    ('krb_admins/admin_commands/kdb5_util', 'kdb5_util', u'Kerberos database maintenance utility', [u'MIT'], 8),
+    ('krb_admins/admin_commands/ktutil', 'ktutil', u'Kerberos keytab file maintenance utility', [u'MIT'], 1),
+    ('krb_admins/admin_commands/k5srvutil', 'k5srvutil', u'host key table (keytab) manipulation utility', [u'MIT'], 1),
+    ('krb_admins/admin_commands/kadmind', 'kadmind', u'KADM5 administration server', [u'MIT'], 8),
+    ('krb_admins/admin_commands/kdb5_ldap_util', 'kdb5_ldap_util', u'Kerberos configuration utility', [u'MIT'], 8),
+    ('krb_admins/conf_files/krb5_conf', 'krb5.conf', u'Kerberos configuration file', [u'MIT'], 5),
+    ('krb_admins/conf_files/kdc_conf', 'kdc.conf', u'Kerberos V5 KDC configuration file', [u'MIT'], 5),
 ]

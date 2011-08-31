@@ -36,6 +36,9 @@
  * + consistent getpwnam/getpwuid interfaces
  * + va_copy fudged if not provided
  * + [v]asprintf
+ * + mkstemp
+ * + zap (support function; macro is in k5-int.h)
+ * + path manipulation
  * + _, N_, dgettext, bindtextdomain, setlocale (for localization)
  */
 
@@ -913,7 +916,7 @@ set_cloexec_file(FILE *f)
    allocate some storage pointed to by the va_list, and in that case
    we'll just lose.  If anyone cares, we could try to devise a test
    for that case.  */
-#define va_copy(dest, src)      memcmp(dest, src, sizeof(va_list))
+#define va_copy(dest, src)      memcpy(dest, src, sizeof(va_list))
 #endif
 
 /* Provide strlcpy/strlcat interfaces. */
@@ -1010,6 +1013,25 @@ extern int krb5int_mkstemp(char *);
 #endif
 
 extern void krb5int_zap(void *ptr, size_t len);
+
+/*
+ * Split a path into parent directory and basename.  Either output parameter
+ * may be NULL if the caller doesn't need it.  parent_out will be empty if path
+ * has no basename.  basename_out will be empty if path ends with a path
+ * separator.  Returns 0 on success or ENOMEM on allocation failure.
+ */
+long k5_path_split(const char *path, char **parent_out, char **basename_out);
+
+/*
+ * Compose two path components, inserting the platform-appropriate path
+ * separator if needed.  If path2 is an absolute path, path1 will be discarded
+ * and path_out will be a copy of path2.  Returns 0 on success or ENOMEM on
+ * allocation failure.
+ */
+long k5_path_join(const char *path1, const char *path2, char **path_out);
+
+/* Return 1 if path is absolute, 0 if it is relative. */
+int k5_path_isabs(const char *path);
 
 /*
  * Localization macros.  If we have gettext, define _ appropriately for

@@ -345,7 +345,7 @@ static struct {
     }
 };
 
-static OM_uint32
+static OM_uint32 KRB5_CALLCONV
 krb5_gss_inquire_sec_context_by_oid (OM_uint32 *minor_status,
                                      const gss_ctx_id_t context_handle,
                                      const gss_OID desired_object,
@@ -398,7 +398,7 @@ static struct {
 };
 #endif
 
-static OM_uint32
+static OM_uint32 KRB5_CALLCONV
 krb5_gss_inquire_cred_by_oid(OM_uint32 *minor_status,
                              const gss_cred_id_t cred_handle,
                              const gss_OID desired_object,
@@ -462,7 +462,7 @@ static struct {
 };
 #endif
 
-static OM_uint32
+static OM_uint32 KRB5_CALLCONV
 krb5_gss_set_sec_context_option (OM_uint32 *minor_status,
                                  gss_ctx_id_t *context_handle,
                                  const gss_OID desired_object,
@@ -525,7 +525,7 @@ static struct {
     },
 };
 
-static OM_uint32
+static OM_uint32 KRB5_CALLCONV
 krb5_gssspi_set_cred_option(OM_uint32 *minor_status,
                             gss_cred_id_t *cred_handle,
                             const gss_OID desired_object,
@@ -593,7 +593,7 @@ static struct {
 #endif
 };
 
-static OM_uint32
+static OM_uint32 KRB5_CALLCONV
 krb5_gssspi_mech_invoke (OM_uint32 *minor_status,
                          const gss_OID desired_mech,
                          const gss_OID desired_object,
@@ -633,7 +633,7 @@ krb5_gssspi_mech_invoke (OM_uint32 *minor_status,
 #define GS2_IAKERB_SASL_NAME      "GS2-IAKERB"
 #define GS2_IAKERB_SASL_NAME_LEN  (sizeof(GS2_IAKERB_SASL_NAME) - 1)
 
-static OM_uint32
+static OM_uint32 KRB5_CALLCONV
 krb5_gss_inquire_mech_for_saslname(OM_uint32 *minor_status,
                                    const gss_buffer_t sasl_mech_name,
                                    gss_OID *mech_type)
@@ -657,7 +657,7 @@ krb5_gss_inquire_mech_for_saslname(OM_uint32 *minor_status,
     return GSS_S_BAD_MECH;
 }
 
-static OM_uint32
+static OM_uint32 KRB5_CALLCONV
 krb5_gss_inquire_saslname_for_mech(OM_uint32 *minor_status,
                                    const gss_OID desired_mech,
                                    gss_buffer_t sasl_mech_name,
@@ -686,7 +686,7 @@ fail:
     return GSS_S_FAILURE;
 }
 
-static OM_uint32
+static OM_uint32 KRB5_CALLCONV
 krb5_gss_inquire_attrs_for_mech(OM_uint32 *minor_status,
                                 gss_const_OID mech,
                                 gss_OID_set *mech_attrs,
@@ -738,7 +738,7 @@ cleanup:
 }
 
 #ifndef NO_PASSWORD
-static OM_uint32
+static OM_uint32 KRB5_CALLCONV
 krb5_gss_pname_to_uid(OM_uint32 *minor,
                       const gss_name_t pname,
                       const gss_OID mech_type,
@@ -778,7 +778,7 @@ krb5_gss_pname_to_uid(OM_uint32 *minor,
 }
 #endif /* !NO_PASSWORD */
 
-static OM_uint32
+static OM_uint32 KRB5_CALLCONV
 krb5_gss_authorize_localname(OM_uint32 *minor,
                              const gss_name_t pname,
                              gss_const_buffer_t local_user,
