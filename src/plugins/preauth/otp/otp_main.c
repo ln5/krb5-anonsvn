@@ -36,13 +36,13 @@
   (1) The kdb is searched for an OTP token identity (KRB5_TL_OTP_ID),
       matching what might be found in preauth attribute "OTP_TOKENID".
 
-  (2) An authenticationn method, i.e. a function, is picked from the
+  (2) An authentication method, i.e. a function, is picked from the
       result of (1).
 
   (3) The kdb is searched for an OTP method data blob
       (KRB5_TL_OTP_BLOB) matching the token id used.
 
-  (4) The authenticationn method from (2) is invoked with the binary
+  (4) The authentication method from (2) is invoked with the binary
       blob from (3).
 
   (5) The result from (4) is returned.
@@ -79,7 +79,8 @@
   A token id may be passed to the KDC using the pre-authentication
   attribute OTP_TOKENID ("kinit -X OTP_TOKENID=mytoken ...").  If no
   OTP_TOKENID is provided, the first KRB5_TL_OTP_ID found is being
-  used.  */
+  used.
+*/
 
 #include <stdbool.h>
 #include <string.h>
