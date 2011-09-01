@@ -36,14 +36,14 @@
   (1) The kdb is searched for an OTP token identity (KRB5_TL_OTP_ID),
       matching what might be found in preauth attribute "OTP_TOKENID".
 
-  (2) An authn method, i.e. a function, is picked from the result of
-      (1).
+  (2) An authenticationn method, i.e. a function, is picked from the
+      result of (1).
 
   (3) The kdb is searched for an OTP method data blob
       (KRB5_TL_OTP_BLOB) matching the token id used.
 
-  (4) The authn method from (2) is invoked with the binary blob from
-      (3).
+  (4) The authenticationn method from (2) is invoked with the binary
+      blob from (3).
 
   (5) The result from (4) is returned.
 
@@ -51,15 +51,14 @@
   Two new tl-data types are defined for the krbExtraData field in the
   Kerberos database, KRB5_TL_OTP_ID and KRB5_TL_OTP_BLOB.
 
-  KRB5_TL_OTP_ID is a string with two tokens separated by a colon.
+  KRB5_TL_OTP_ID is a string with two parts separated by a colon.
 
     <otp-token-id>:<method-name>
 
     otp-token-id identifies a unique token on the form of a class A
     OATH token identifier as specified in
-    http://www.openauthentication.org/oath-id: MMTTUUUUUUUU.
-    M=manufacturer, T=token type, U=manufacturer unique id
-    method-name.
+    http://www.openauthentication.org/oath-id: MMTTUUUUUUUU, where
+    M=manufacturer, T=token type and U=manufacturer unique id.
 
     method-name identifies the method to use for authentication
     (f.ex. "basicauth", "ykclient" or "nativehotp").  The method name
@@ -78,9 +77,9 @@
     chosen based on the KRB5_TL_OTP_ID.
 
   A token id may be passed to the KDC using the pre-authentication
-  attribute "OTP_TOKENID".  If no OTP_TOKENID is provided, the first
-  KRB5_TL_OTP_ID found in the kdb is used.
- */
+  attribute OTP_TOKENID ("kinit -X OTP_TOKENID=mytoken ...").  If no
+  OTP_TOKENID is provided, the first KRB5_TL_OTP_ID found is being
+  used.  */
 
 #include <stdbool.h>
 #include <string.h>
