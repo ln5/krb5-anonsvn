@@ -29,7 +29,7 @@
 
 krb5_error_code
 krb5int_tgtname(krb5_context context, const krb5_data *, const krb5_data *,
-             krb5_principal *);
+                krb5_principal *);
 
 krb5_error_code
 krb5int_libdefault_boolean(krb5_context, const krb5_data *, const char *,
@@ -177,5 +177,8 @@ krb5_error_code
 krb5int_mk_setpw_req(krb5_context context, krb5_auth_context auth_context,
                      krb5_data *ap_req, krb5_principal targetprinc,
                      char *passwd, krb5_data *packet);
+
+void
+k5_ccselect_free_context(krb5_context context);
 
 #endif /* KRB5_INT_FUNC_PROTO__ */

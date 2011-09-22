@@ -219,12 +219,13 @@ typedef struct _pkinit_context *pkinit_context;
  * Client's per-request context
  */
 struct _pkinit_req_context {
-    int magic;
+    unsigned int magic;
     pkinit_req_crypto_context cryptoctx;
     pkinit_req_opts *opts;
     pkinit_identity_crypto_context idctx;
     pkinit_identity_opts *idopts;
     krb5_preauthtype pa_type;
+    int rfc6112_kdc;
 };
 typedef struct _pkinit_req_context *pkinit_req_context;
 
@@ -357,7 +358,7 @@ krb5_error_code pkinit_libdefault_integer
 /*
  * debugging functions
  */
-void print_buffer(unsigned char *, unsigned int);
+void print_buffer(const unsigned char *, unsigned int);
 void print_buffer_bin(unsigned char *, unsigned int, char *);
 
 /*

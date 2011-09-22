@@ -192,7 +192,7 @@ WINMAKEFILES=Makefile \
 	lib\krb5\rcache\Makefile \
 	lib\krb5\unicode\Makefile \
 	util\Makefile \
-	util\et\Makefile util\profile\Makefile \
+	util\et\Makefile util\profile\Makefile util\profile\testmod\Makefile \
 	util\support\Makefile \
 	util\windows\Makefile \
 	windows\Makefile windows\lib\Makefile \
@@ -299,6 +299,8 @@ WINMAKEFILES=Makefile \
 ##DOS##util\et\Makefile: util\et\Makefile.in $(MKFDEP)
 ##DOS##	$(WCONFIG) config < $@.in > $@
 ##DOS##util\profile\Makefile: util\profile\Makefile.in $(MKFDEP)
+##DOS##	$(WCONFIG) config < $@.in > $@
+##DOS##util\profile\testmod\Makefile: util\profile\testmod\Makefile.in $(MKFDEP)
 ##DOS##	$(WCONFIG) config < $@.in > $@
 ##DOS##util\support\Makefile: util\support\Makefile.in $(MKFDEP)
 ##DOS##	$(WCONFIG) config < $@.in > $@
@@ -671,7 +673,10 @@ OTHEREXCLUDES = \
 	include/k5-platform.h \
 	include/gssrpc \
 	lib/apputils/dummy.c \
+	lib/crypto/crypto_tests/camellia-test.c \
 	lib/crypto/builtin/aes \
+	lib/crypto/builtin/camellia \
+	lib/crypto/builtin/sha2 \
 	lib/gssapi/generic/gssapiP_generic.h \
 	lib/gssapi/generic/gssapi_ext.h \
 	lib/gssapi/krb5/gssapiP_krb5.h \
@@ -701,7 +706,9 @@ OTHEREXCLUDES = \
 	util/et/com_err.h \
 	util/profile/prof_int.h \
 	util/profile/profile.hin \
-	util/profile/profile_tcl.c
+	util/profile/profile_tcl.c \
+	util/verto \
+	util/k5ev
 
 EXCLUDES = `for i in $(BSDFILES) $(OTHEREXCLUDES); do echo $$i; done | $(AWK) '{ print "-path", $$1, "-o" }'` -path /dev/null
 

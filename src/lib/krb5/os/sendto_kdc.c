@@ -913,12 +913,12 @@ maybe_send(krb5_context context, struct conn_state *conn,
 static void
 kill_conn(struct conn_state *conn, struct select_state *selstate, int err)
 {
+    dprint("abandoning connection %d: %m\n", conn->fd, err);
+    cm_remove_fd(selstate, conn->fd);
+    closesocket(conn->fd);
+    conn->fd = INVALID_SOCKET;
     conn->state = FAILED;
     conn->err = err;
-    shutdown(conn->fd, SHUTDOWN_BOTH);
-    cm_remove_fd(selstate, conn->fd);
-    dprint("abandoning connection %d: %m\n", conn->fd, err);
-    /* Fix up max fd for next select call.  */
 }
 
 /* Check socket for error.  */
@@ -1146,7 +1146,7 @@ service_fds(krb5_context context, struct select_state *selstate, int interval,
             int (*msg_handler)(krb5_context, const krb5_data *, void *),
             void *msg_handler_data, struct conn_state **winner_out)
 {
-    int e, selret;
+    int e, selret = 0;
     struct timeval now;
     struct conn_state *state;
 

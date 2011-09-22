@@ -130,19 +130,21 @@ KFWFLAGS=-DUSE_LEASH=1
 CC=cl
 
 PDB_OPTS=-Fd$(OUTPRE)\ -FD
-CPPFLAGS=-I$(top_srcdir)\include -I$(top_srcdir)\include\krb5 $(DNSFLAGS) -DWIN32_LEAN_AND_MEAN -DKRB5_DEPRECATED=1 -D_CRT_SECURE_NO_DEPRECATE $(KFWFLAGS) $(TIME_T_FLAGS)
+CPPFLAGS=-I$(top_srcdir)\include -I$(top_srcdir)\include\krb5 $(DNSFLAGS) -DWIN32_LEAN_AND_MEAN -DKRB5_DEPRECATED=1 -DKRB5_PRIVATE -D_CRT_SECURE_NO_DEPRECATE $(KFWFLAGS) $(TIME_T_FLAGS)
 CCOPTS=-nologo /W3 $(PDB_OPTS) $(DLL_FILE_DEF)
 LOPTS=-nologo -incremental:no
 
 !if  ("$(CPU)" == "IA64" ) || ("$(CPU)" == "AMD64" ) || ("$(CPU)" == "ALPHA64" )
-CCLINKOPTION=/link bufferoverflowu.lib
-SCLIB=bufferoverflowu.lib
-DEBUGOPT=/Zi
+ENTRYPOINT=_DllMainCRTStartup
+#CCLINKOPTION=/link bufferoverflowu.lib
+#SCLIB=bufferoverflowu.lib
+#DEBUGOPT=/Zi
 !else
+ENTRYPOINT=_DLLMainCRTStartup@12
+!endif
 CCLINKOPTION=
 SCLIB=
 DEBUGOPT=/Zi
-!endif
 
 #if the compiler is vstudio 8, generate manifest
 !if exists("$(VCINSTALLDIR)\..\..\MICROSOFT VISUAL STUDIO 8")

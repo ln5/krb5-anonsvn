@@ -83,14 +83,15 @@ krb5_gss_inquire_cred(minor_status, cred_handle, name, lifetime_ret,
     gss_OID_set *mechanisms;
 {
     krb5_context context;
-    krb5_gss_cred_id_t cred;
+    gss_cred_id_t defcred = GSS_C_NO_CREDENTIAL;
+    krb5_gss_cred_id_t cred = NULL;
     krb5_error_code code;
     krb5_timestamp now;
     krb5_deltat lifetime;
     krb5_gss_name_t ret_name;
     krb5_principal princ;
     gss_OID_set mechs;
-    OM_uint32 ret;
+    OM_uint32 major, tmpmin, ret;
 
     ret = GSS_S_FAILURE;
     ret_name = NULL;
@@ -107,23 +108,21 @@ krb5_gss_inquire_cred(minor_status, cred_handle, name, lifetime_ret,
     /* check for default credential */
     /*SUPPRESS 29*/
     if (cred_handle == GSS_C_NO_CREDENTIAL) {
-        OM_uint32 major;
-
-        if ((major = kg_get_defcred(minor_status, (gss_cred_id_t *)&cred)) &&
-            GSS_ERROR(major)) {
-            krb5_free_context(context);
-            return(major);
-        }
-    } else {
-        OM_uint32 major;
-
-        major = krb5_gss_validate_cred(minor_status, cred_handle);
+        major = kg_get_defcred(minor_status, &defcred);
         if (GSS_ERROR(major)) {
             krb5_free_context(context);
             return(major);
         }
-        cred = (krb5_gss_cred_id_t) cred_handle;
+        cred_handle = defcred;
     }
+
+    major = kg_cred_resolve(minor_status, context, cred_handle, GSS_C_NO_NAME);
+    if (GSS_ERROR(major)) {
+        krb5_gss_release_cred(minor_status, &defcred);
+        krb5_free_context(context);
+        return(major);
+    }
+    cred = (krb5_gss_cred_id_t)cred_handle;
 
     if ((code = krb5_timeofday(context, &now))) {
         *minor_status = code;
@@ -131,12 +130,6 @@ krb5_gss_inquire_cred(minor_status, cred_handle, name, lifetime_ret,
         goto fail;
     }
 
-    code = k5_mutex_lock(&cred->lock);
-    if (code != 0) {
-        *minor_status = code;
-        ret = GSS_S_FAILURE;
-        goto fail;
-    }
     if (cred->tgt_expire > 0) {
         if ((lifetime = cred->tgt_expire - now) < 0)
             lifetime = 0;
@@ -161,7 +154,6 @@ krb5_gss_inquire_cred(minor_status, cred_handle, name, lifetime_ret,
                 code = 0;
         }
         if (code) {
-            k5_mutex_unlock(&cred->lock);
             *minor_status = code;
             save_error_info(*minor_status, context);
             ret = GSS_S_FAILURE;
@@ -178,7 +170,6 @@ krb5_gss_inquire_cred(minor_status, cred_handle, name, lifetime_ret,
             GSS_ERROR(ret = generic_gss_add_oid_set_member(minor_status,
                                                            gss_mech_krb5,
                                                            &mechs))) {
-            k5_mutex_unlock(&cred->lock);
             if (ret_name)
                 kg_release_name(context, &ret_name);
             /* *minor_status set above */
@@ -210,11 +201,8 @@ krb5_gss_inquire_cred(minor_status, cred_handle, name, lifetime_ret,
     *minor_status = 0;
     return((lifetime == 0)?GSS_S_CREDENTIALS_EXPIRED:GSS_S_COMPLETE);
 fail:
-    if (cred_handle == GSS_C_NO_CREDENTIAL) {
-        OM_uint32 tmp_min_stat;
-
-        krb5_gss_release_cred(&tmp_min_stat, (gss_cred_id_t *)&cred);
-    }
+    k5_mutex_unlock(&cred->lock);
+    krb5_gss_release_cred(&tmpmin, &defcred);
     krb5_free_context(context);
     return ret;
 }

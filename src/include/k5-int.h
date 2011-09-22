@@ -372,9 +372,9 @@ typedef INT64_TYPE krb5_int64;
 #define KDC_ERR_DIGEST_IN_SIGNED_DATA_NOT_ACCEPTED 80 /* bad digest algorithm in SignedData */
 #define KDC_ERR_PUBLIC_KEY_ENCRYPTION_NOT_SUPPORTED 81
 #define KRB_AP_ERR_IAKERB_KDC_NOT_FOUND         85 /* The IAKERB proxy could
-not find a KDC */
+                                                      not find a KDC */
 #define KRB_AP_ERR_IAKERB_KDC_NO_RESPONSE       86 /* The KDC did not respond
-to the IAKERB proxy */
+                                                      to the IAKERB proxy */
 
 /*
  * This structure is returned in the e-data field of the KRB-ERROR
@@ -1414,7 +1414,8 @@ struct plugin_interface {
 #define PLUGIN_INTERFACE_KADM5_HOOK  1
 #define PLUGIN_INTERFACE_CLPREAUTH   2
 #define PLUGIN_INTERFACE_KDCPREAUTH  3
-#define PLUGIN_NUM_INTERFACES        4
+#define PLUGIN_INTERFACE_CCSELECT    4
+#define PLUGIN_NUM_INTERFACES        5
 
 /* Retrieve the plugin module of type interface_id and name modname,
  * storing the result into module. */
@@ -1454,6 +1455,7 @@ struct _kdb5_dal_handle;        /* private, in kdb5.h */
 typedef struct _kdb5_dal_handle kdb5_dal_handle;
 struct _kdb_log_context;
 typedef struct krb5_preauth_context_st krb5_preauth_context;
+struct ccselect_module_handle;
 struct _krb5_context {
     krb5_magic      magic;
     krb5_enctype    *in_tkt_etypes;
@@ -1493,6 +1495,9 @@ struct _krb5_context {
 
     /* preauth module stuff */
     krb5_preauth_context *preauth_context;
+
+    /* cache module stuff */
+    struct ccselect_module_handle **ccselect_handles;
 
     /* error detail info */
     struct errinfo err;
@@ -2418,6 +2423,7 @@ struct _krb5_cc_ops {
                                                 krb5_timestamp *);
     krb5_error_code (KRB5_CALLCONV *lock)(krb5_context, krb5_ccache);
     krb5_error_code (KRB5_CALLCONV *unlock)(krb5_context, krb5_ccache);
+    krb5_error_code (KRB5_CALLCONV *switch_to)(krb5_context, krb5_ccache);
 };
 
 extern const krb5_cc_ops *krb5_cc_dfl_ops;

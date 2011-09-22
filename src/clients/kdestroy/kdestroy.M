@@ -26,7 +26,7 @@
 kdestroy \- destroy Kerberos tickets
 .SH SYNOPSIS
 .B kdestroy
-[\fB\-q\fP] [\fB\-c\fP \fIcache_name]
+[\fB\-A\fP] [\fB\-q\fP] [\fB\-c\fP \fIcache_name]
 .br
 .SH DESCRIPTION
 The
@@ -37,6 +37,9 @@ the credentials cache is not specified, the default credentials cache is
 destroyed.
 .SH OPTIONS
 .TP
+.B \-A
+Destroys all caches in the collection, if a cache collection is
+available.
 .B \-q
 Run quietly.  Normally
 .B kdestroy
@@ -65,7 +68,12 @@ file, so that your tickets are destroyed automatically when you log out.
 uses the following environment variables:
 .TP "\w'.SM KRB5CCNAME\ \ 'u"
 .SM KRB5CCNAME
-Location of the Kerberos 5 credentials (ticket) cache.
+Location of the default Kerberos 5 credentials (ticket) cache, in the
+form \fItype\fP:\fIresidual\fP.  If no type prefix is present, the
+\fBFILE\fP type is assumed.  The type of the default cache may
+determine the availability of a cache collection; for instance, a
+default cache of type \fBDIR\fP causes caches within the directory to
+be present in the collection.
 .SH FILES
 .TP "\w'/tmp/krb5cc_[uid]\ \ 'u"
 /tmp/krb5cc_[uid]

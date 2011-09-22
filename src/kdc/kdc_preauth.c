@@ -298,7 +298,7 @@ static preauth_system static_preauth_systems[] = {
 #endif
 };
 
-#define NUM_STATIC_PREAUTH_SYSTEMS (sizeof(static_preauth_systems) / \
+#define NUM_STATIC_PREAUTH_SYSTEMS (sizeof(static_preauth_systems) /    \
                                     sizeof(*static_preauth_systems))
 
 static preauth_system *preauth_systems;
@@ -1104,6 +1104,8 @@ check_padata (krb5_context context, krb5_db_entry *client, krb5_data *req_pkt,
         /* This value is shared with KRB5KDC_ERR_DH_KEY_PARAMETERS_NOT_ACCEPTED. */
         /* case KRB5KDC_ERR_KEY_TOO_WEAK: */
     case KRB5KDC_ERR_DISCARD:
+        /* pkinit alg-agility */
+    case KRB5KDC_ERR_NO_ACCEPTABLE_KDF:
         return retval;
     default:
         return KRB5KDC_ERR_PREAUTH_FAILED;

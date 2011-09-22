@@ -72,7 +72,7 @@
 static int verbose = 1;
 static int spnego = 0;
 static gss_OID_desc gss_spnego_mechanism_oid_desc =
-        {6, (void *)"\x2b\x06\x01\x05\x05\x02"};
+{6, (void *)"\x2b\x06\x01\x05\x05\x02"};
 
 static void
 usage()
@@ -395,7 +395,7 @@ read_file(file_name, in_buf)
         perror("read");
         exit(1);
     }
-    if (count < in_buf->length)
+    if (count < (int)in_buf->length)
         fprintf(stderr, "Warning, only read in %d bytes, expected %d\n",
                 count, (int) in_buf->length);
 }
@@ -563,7 +563,7 @@ call_server(host, port, oid, service_name, gss_flags, auth_flag,
         in_buf.length = strlen((char *)in_buf.value);
     }
 
-    for (i = 0; i < mcount; i++) {
+    for (i = 0; i < (size_t)mcount; i++) {
         if (wrap_flag) {
             maj_stat =
                 gss_wrap(&min_stat, context, encrypt_flag, GSS_C_QOP_DEFAULT,

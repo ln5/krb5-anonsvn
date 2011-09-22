@@ -57,6 +57,23 @@
  */
 int longhorn = 0;       /* Talking to a Longhorn server? */
 
+/**
+ * Return true if we should use ContentInfo rather than SignedData. This
+ * happens if we are talking to what might be an old (pre-6112) MIT KDC and
+ * we're using anonymous.
+ */
+static int
+use_content_info(krb5_context context, pkinit_req_context req,
+                 krb5_principal client)
+{
+    if (req->rfc6112_kdc)
+        return 0;
+    if (krb5_principal_compare_any_realm(context, client,
+                                         krb5_anonymous_principal()))
+        return 1;
+    return 0;
+}
+
 static krb5_error_code
 pkinit_as_req_create(krb5_context context, pkinit_context plgctx,
                      pkinit_req_context reqctx, krb5_timestamp ctsec,
@@ -347,9 +364,7 @@ pkinit_as_req_create(krb5_context context,
             retval = ENOMEM;
             goto cleanup;
         }
-        /* For the new protocol, we support anonymous. */
-        if (krb5_principal_compare_any_realm(context, client,
-                                             krb5_anonymous_principal())) {
+        if (use_content_info(context, reqctx, client)) {
             retval = cms_contentinfo_create(context, plgctx->cryptoctx,
                                             reqctx->cryptoctx, reqctx->idctx,
                                             CMS_SIGN_CLIENT, (unsigned char *)
@@ -669,6 +684,7 @@ pkinit_as_rep_parse(krb5_context context,
     unsigned int client_key_len = 0;
     krb5_checksum cksum = {0, 0, 0, NULL};
     krb5_data k5data;
+    krb5_octet_data secret;
     int valid_san = 0;
     int valid_eku = 0;
     int need_eku_checking = 1;
@@ -779,12 +795,35 @@ pkinit_as_rep_parse(krb5_context context,
             goto cleanup;
         }
 
-        retval = pkinit_octetstring2key(context, etype, client_key,
+        /* If we have a KDF algorithm ID, call the algorithm agility KDF... */
+        if (kdc_reply->u.dh_Info.kdfID) {
+            secret.length = client_key_len;
+            secret.data = client_key;
+
+            retval = pkinit_alg_agility_kdf(context, &secret,
+                                            kdc_reply->u.dh_Info.kdfID,
+                                            request->client,
+                                            request->server, etype,
+                                            (krb5_octet_data *)encoded_request,
+                                            (krb5_octet_data *)as_rep,
+                                            key_block);
+
+            if (retval) {
+                pkiDebug("failed to create key pkinit_alg_agility_kdf %s\n",
+                         error_message(retval));
+                goto cleanup;
+            }
+
+        /* ...otherwise, use the older octetstring2key function. */
+        } else {
+
+            retval = pkinit_octetstring2key(context, etype, client_key,
                                         client_key_len, key_block);
-        if (retval) {
-            pkiDebug("failed to create key pkinit_octetstring2key %s\n",
-                     error_message(retval));
-            goto cleanup;
+            if (retval) {
+                pkiDebug("failed to create key pkinit_octetstring2key %s\n",
+                         error_message(retval));
+                goto cleanup;
+            }
         }
 
         break;
@@ -1012,6 +1051,9 @@ pkinit_client_process(krb5_context context, krb5_clpreauth_moddata moddata,
         return EINVAL;
 
     switch ((int) in_padata->pa_type) {
+    case KRB5_PADATA_PKINIT_KX:
+        reqctx->rfc6112_kdc = 1;
+        return 0;
     case KRB5_PADATA_PK_AS_REQ:
         pkiDebug("processing KRB5_PADATA_PK_AS_REQ\n");
         processing_request = 1;
@@ -1176,14 +1218,23 @@ cleanup:
 static int
 pkinit_client_get_flags(krb5_context kcontext, krb5_preauthtype patype)
 {
+    if (patype == KRB5_PADATA_PKINIT_KX)
+        return PA_INFO|PA_PSEUDO;
     return PA_REAL;
 }
 
+/*
+ * We want to be notified about KRB5_PADATA_PKINIT_KX in addition to the actual
+ * pkinit patypes because RFC 6112 requires anonymous KDCs to send it. We use
+ * that to determine whether to use the broken MIT 1.9 behavior of sending
+ * ContentInfo rather than SignedData or the RFC 6112 behavior
+ */
 static krb5_preauthtype supported_client_pa_types[] = {
     KRB5_PADATA_PK_AS_REP,
     KRB5_PADATA_PK_AS_REQ,
     KRB5_PADATA_PK_AS_REP_OLD,
     KRB5_PADATA_PK_AS_REQ_OLD,
+    KRB5_PADATA_PKINIT_KX,
     0
 };
 
