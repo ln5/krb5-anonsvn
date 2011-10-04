@@ -2163,8 +2163,6 @@ asn1_encode_typed_data(asn1buf *buf, const krb5_typed_data *val,
 /* Definitions for http://tools.ietf.org/html/draft-ietf-krb-wg-otp-preauth-14 */
 
 DEFFNLENTYPE(oid, unsigned char *, asn1_encode_oid);
-DEFFIELDTYPE(oid_data, krb5_octet_data,
-             FIELDOF_STRING(krb5_octet_data, oid, data, length, -1));
 DEFFIELDTYPE(ostring_octet_data, krb5_octet_data,
              FIELDOF_STRING(krb5_octet_data, octetstring, data, length, -1));
 
@@ -2180,19 +2178,6 @@ FIELDOF_NORM(krb5_algorithm_identifier, oid_data, algorithm, 0),
 FIELDOF_OPT(krb5_algorithm_identifier, ostring_octet_data, parameters, 1, 1),
 };
 /*             } */
-
-static unsigned int
-algorithm_identifier_optional (const void *p)
-{
-    unsigned int optional = 0;
-    const krb5_algorithm_identifier *val = p;
-
-    if (val->parameters.data)
-        optional |= (1u <<1);
-
-    return optional;
-}
-DEFSEQTYPE( algorithm_identifier, krb5_algorithm_identifier, algorithm_identifier_fields, algorithm_identifier_optional);
 
 /*           OTP-KEYINFO ::= SEQUENCE { */
 static const struct field_info otp_keyinfo_fields[] = {
