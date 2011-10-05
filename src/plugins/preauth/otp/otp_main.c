@@ -33,27 +33,22 @@
 /*
   A successful OTP authentication follows this process on the KDC.
 
-  (1) The kdb is searched for an OTP token identity (KRB5_TL_OTP_ID),
-      matching what might be found in preauth attribute "OTP_TOKENID".
+  (1) The kdb is searched for an OTP token identity, matching what
+      might be found in preauth attribute "OTP_TOKENID".
 
   (2) An authentication method, i.e. a function, is picked from the
       result of (1).
 
-  (3) The kdb is searched for an OTP method data blob
-      (KRB5_TL_OTP_BLOB) matching the token id used.
+  (3) The authentication method from (2) is invoked with a potential
+      data blob found in (1).
 
-  (4) The authentication method from (2) is invoked with the binary
-      blob from (3).
+  (4) The result from (3) is returned.
 
-  (5) The result from (4) is returned.
+  OTP info per principal is stored in the kdb using the
+  KRB5_TL_STRING_ATTRS tl-data type.  The keyword used is "otp-token".
+  The format of the value is
 
-
-  Two new tl-data types are defined for the krbExtraData field in the
-  Kerberos database, KRB5_TL_OTP_ID and KRB5_TL_OTP_BLOB.
-
-  KRB5_TL_OTP_ID is a string with two parts separated by a colon.
-
-    <otp-token-id>:<method-name>
+    <otp-token-id>:<method-name>:<data-blob>
 
     otp-token-id identifies a unique token on the form of a class A
     OATH token identifier as specified in
@@ -66,21 +61,12 @@
     plugin.  A method may use the prefix "otp_<method-name>_" for
     profile names in krb5.conf.
 
-  KRB5_TL_OTP_BLOB is a binary blob tagged with a token id.
-
-    <otp-token-id>:<binary-blob>
-
-    otp-token-id is the same token identifier as found in a
-    KRB5_TL_OTP_ID.
-
-    binary-blob is a binary blob passed to the authentication method
-    chosen based on the KRB5_TL_OTP_ID.
+    data-blob is a binary blob passed to the authentication method
+    chosen based on method-name.
 
   A token id may be passed to the KDC using the pre-authentication
   attribute OTP_TOKENID ("kinit -X OTP_TOKENID=mytoken ...").  If no
-  OTP_TOKENID is provided, the first KRB5_TL_OTP_ID found is being
-  used.
-*/
+  OTP_TOKENID is provided, the first token id found is being used.  */
 
 #include <stdbool.h>
 #include <string.h>
@@ -99,11 +85,6 @@
 #define KRB5_PADATA_OTP_REQUEST    142
 #define KRB5_PADATA_OTP_CONFIRM    143
 #define KRB5_PADATA_OTP_PIN_CHANGE 144
-
-/* FIXME: Belong in kdb.h.  */
-#define KRB5_TL_OTP_ID                  0x0800 /* OTP token id */
-#define KRB5_TL_OTP_BLOB                0x1000 /* OTP binary blob */
-
 
 #define OTP_FLAG_RESERVED 0
 #define OTP_FLAG_NEXT_OTP (1u<<1)
@@ -384,52 +365,106 @@ otp_server_free_req_ctx(struct otp_req_ctx **request)
     *request = NULL;
 }
 
+/* Find OTP info for principal in kdb.  */
+static int
+otp_server_find_token(struct otp_server_ctx *ctx,
+                      struct _krb5_db_entry_new *client,
+                      char **token_id_out,
+                      char **method_name_out,
+                      char **blob_out)
+{
+    krb5_error_code retval = 0;
+    krb5_string_attr *strs = NULL;
+    int n_strs = 0;
+    char *found_string = NULL;
+    char *method_name = NULL;
+    char *blob = NULL;
+
+    *token_id_out = NULL;
+    *method_name_out = NULL;
+    *blob_out = NULL;
+
+    found_string = NULL;
+    retval = krb5_dbe_get_strings(ctx->krb5_context, client, &strs, &n_strs);
+    if (retval == 0) {
+        while (--n_strs >= 0) {
+            if (strncmp(strs[n_strs].key, "otp-token",
+                        sizeof("otp-token")) == 0) {
+                /* TODO: Match key against PA attribute "OTP_TOKENID".
+                   Use TOKEN_ID_LENGTH.  */
+                found_string = strs[n_strs].value;
+                break;
+            }
+        }
+    }
+    if (found_string != NULL) {
+        /* <otp-token-id>:<method-name>:<data-blob> */
+        method_name = strchr(found_string, ':');
+        if (method_name != NULL) {
+            *method_name++ = '\0';
+            blob = strchr(method_name, ':');
+            if (blob != NULL) {
+                *blob++ = '\0';
+                *blob_out = strdup(blob);
+                if (*blob_out == NULL) {
+                    retval = ENOMEM;
+                    goto errout;
+                }
+            }
+            *method_name_out = strdup(method_name);
+            if (*method_name_out == NULL) {
+                retval = ENOMEM;
+                goto errout;
+            }
+            *token_id_out = strdup(found_string);
+            if (*token_id_out == NULL) {
+                retval = ENOMEM;
+                goto errout;
+            }
+        }
+    }
+    krb5_dbe_free_strings(ctx->krb5_context, strs, n_strs);
+    return 0;
+
+ errout:
+    krb5_dbe_free_strings(ctx->krb5_context, strs, n_strs);
+    free(*token_id_out);
+    *token_id_out = NULL;
+    free(*method_name_out);
+    *method_name_out = NULL;
+    free(*blob_out);
+    *blob_out = NULL;
+    return retval;
+}
+
 /* Create a request context with the client, blob, token and method, to use in
    the server edata and verify methods. */
 static int
 otp_server_create_req_ctx(struct otp_server_ctx *ctx,
                           struct _krb5_db_entry_new *client,
-                          struct otp_req_ctx **request)
+                          struct otp_req_ctx **request_out)
 {
-    krb5_tl_data *tl_data;
-    char *token_id = NULL;
-    int retval = -1;
+    krb5_error_code retval = 0;
     char *method_name = NULL;
-    char *blob = NULL;
     int f;
 
-    *request = calloc(1, sizeof(struct otp_req_ctx));
-    if (*request == NULL) {
+    *request_out = calloc(1, sizeof(struct otp_req_ctx));
+    if (*request_out == NULL) {
         return ENOMEM;
     }
-    (*request)->client = client;
+    (*request_out)->client = client;
 
-    /* Find (the right) token id in the kdb.  */
-    tl_data = client->tl_data;
-    while (tl_data != NULL) {
-        if (tl_data->tl_data_type == KRB5_TL_OTP_ID) {
-            if (tl_data->tl_data_contents[tl_data->tl_data_length] == '\0') {
-                free(token_id);
-                token_id = calloc(1, tl_data->tl_data_length);
-                if (token_id == NULL) {
-                    return ENOMEM;
-                    goto errout;
-                }
-                memcpy(token_id, tl_data->tl_data_contents,
-                       tl_data->tl_data_length);
-                method_name = strchr(token_id, ':');
-                if (method_name != NULL) {
-                    *method_name++ = '\0';
-                    /* TODO: Match token_id against PA attribute
-                       "OTP_TOKENID".  Use TOKEN_ID_LENGTH.  */
-                    break;
-                }
-            }
-        }
-        tl_data = tl_data->tl_data_next;
+    retval = otp_server_find_token(ctx,
+                                   client,
+                                   &((*request_out)->token_id),
+                                   &method_name,
+                                   &((*request_out)->blob));
+    if (retval != 0) {
+        SERVER_DEBUG("Error getting OTP info for principal: %d.", retval);
+        goto errout;
     }
 
-    if (tl_data == NULL) {
+    if ((*request_out)->token_id == NULL) {
         SERVER_DEBUG("Token id not found for principal.");
         retval = ENOENT;
         goto errout;
@@ -443,71 +478,25 @@ otp_server_create_req_ctx(struct otp_server_ctx *ctx,
 
     for (f = 0; otp_methods[f].name != NULL; f++) {
         if (strcmp(otp_methods[f].name, method_name) == 0) {
-            (*request)->method = &otp_methods[f];
+            (*request_out)->method = &otp_methods[f];
         }
     }
-
-    if ((*request)->method == NULL) {
+    if ((*request_out)->method == NULL) {
         SERVER_DEBUG("Authentication method %s not configured.", method_name);
         retval = ENOENT;
         goto errout;
     }
 
-    (*request)->token_id = token_id;
-    SERVER_DEBUG("Token id [%s] found, method [%s].", (*request)->token_id,
-                 method_name);
-    /* token_id will be freed in otp_server_free_req_ctx().  */
-    token_id = NULL;
-    method_name = NULL;
-
-    /* Find blob matching the token_id.  */
-    tl_data = client->tl_data;
-    while (tl_data != NULL) {
-        int found_flag = 0;
-        if (tl_data->tl_data_type == KRB5_TL_OTP_BLOB) {
-            free(blob);
-            blob = calloc(1, tl_data->tl_data_length);
-            if (blob == NULL) {
-                retval = ENOMEM;
-                goto errout;
-            }
-            memcpy(blob, tl_data->tl_data_contents, tl_data->tl_data_length);
-            for (f = 0; f < tl_data->tl_data_length; f++) {
-                if (blob[f] == ':') {
-                    blob[f] = '\0';
-                    if (strcmp(blob, (*request)->token_id) == 0) {
-                        found_flag = 1;
-                        (*request)->blobsize = tl_data->tl_data_length - f - 1;
-                        (*request)->blob = malloc((*request)->blobsize);
-                        if ((*request)->blob == NULL) {
-                            retval = ENOMEM;
-                            goto errout;
-                        }
-                        memcpy((*request)->blob, blob + f + 1,
-                               (*request)->blobsize);
-                        break;
-                    }
-                }
-            }
-        }
-        if (found_flag) {
-            break;
-        }
-        tl_data = tl_data->tl_data_next;
-    }
-
-    retval = 0;
-    goto out;
+    SERVER_DEBUG("Token id [%s] found; method [%s], blob [%s].",
+                 (*request_out)->token_id,
+                 method_name,
+                 (*request_out)->blob ? (*request_out)->blob : "");
+    free(method_name);
+    return 0;
 
  errout:
-    otp_server_free_req_ctx(request);
-
- out:
-    if (blob != NULL)
-        free(blob);
-    if (token_id != NULL)
-        free(token_id);
-
+    otp_server_free_req_ctx(request_out);
+    free(method_name);
     return retval;
 }
 
@@ -538,71 +527,6 @@ get_config(struct otp_server_ctx *otp_ctx,
     return result;
 }
 
-static int
-search_db_type(void *krb_ctx,
-               int search, /* type */
-               void **state,
-               struct otp_tlv **tlv_out)
-{
-    struct otp_req_ctx *ctx = krb_ctx;
-    int retval = 0;
-    krb5_tl_data *tl_data = NULL;
-    struct otp_tlv *tlv = NULL;
-
-    if (state != NULL) {
-        tl_data = *state;      /* Note that this may well be NULL.  */
-    }
-    else {
-        if (ctx->client == NULL) {
-            SERVER_DEBUG("%s: called before server_get_edata().", __func__);
-            retval = EINVAL;
-            goto errout;
-        }
-        tl_data = ctx->client->tl_data;
-    }
-
-    while (tl_data != NULL) {
-        if (tl_data->tl_data_type == search) {
-            tlv = calloc(1, sizeof(*tlv));
-            if (tlv == NULL) {
-                retval = ENOMEM;
-                goto errout;
-            }
-            tlv->value = calloc(1, tl_data->tl_data_length);
-            if (tlv->value == NULL) {
-                retval = ENOMEM;
-                goto errout;
-            }
-            memcpy(tlv->value,
-                   tl_data->tl_data_contents,
-                   tl_data->tl_data_length);
-            tlv->type = tl_data->tl_data_type;
-            tlv->length = tl_data->tl_data_length;
-
-            if (state != NULL) {
-                *state = tl_data->tl_data_next;
-            }
-
-            if (tlv_out != NULL) {
-                *tlv_out = tlv;
-            }
-            break;
-        }
-
-        tl_data = tl_data->tl_data_next;
-    }
-
-    return 0;
-
- errout:
-    if (tlv != NULL) {
-        free(tlv->value);
-    }
-    free(tlv);
-    return retval;
-}
-
-
 static void
 server_init_methods(struct otp_server_ctx *ctx)
 {
@@ -613,7 +537,7 @@ server_init_methods(struct otp_server_ctx *ctx)
         struct otp_method *m = &otp_methods[f];
         err = m->init(ctx,
                       get_config,
-                      search_db_type,
+                      NULL,   /* FIXME: remove (was search_db_type) */
                       &m->ftable,
                       &m->context);
         if (err == 0) {
@@ -860,8 +784,8 @@ otp_server_verify(krb5_context context,
         goto errout;
     }
 
-    assert(otp_req_ctx->method->ftable);
-    assert(otp_req_ctx->method->ftable->server_verify);
+    assert(otp_req_ctx->method->ftable != NULL);
+    assert(otp_req_ctx->method->ftable->server_verify != NULL);
     ret = otp_req_ctx->method->ftable->server_verify(otp_req_ctx, otp);
     free(otp);
 

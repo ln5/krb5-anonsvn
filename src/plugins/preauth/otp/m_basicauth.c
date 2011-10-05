@@ -101,11 +101,6 @@ verify_otp(const struct otp_req_ctx *req_ctx, const char *pw)
         SERVER_DEBUG("[basicauth] Binary blob is missing.");
         return EINVAL;
     }
-    if (req_ctx->blob[req_ctx->blobsize] != '\0') {
-        SERVER_DEBUG("[basicauth] Invalid blob of length %lu.",
-                     req_ctx->blobsize);
-        return EINVAL;
-    }
     username = req_ctx->blob;
 
     if (ctx->url == NULL) {

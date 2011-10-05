@@ -14,11 +14,13 @@ LIBMAJOR=0
 LIBMINOR=0
 SO_EXT=.so
 RELDIR=../plugins/preauth/otp
-# Depends on libk5crypto and libkrb5
+# In-tree libraries we depend on:
 SHLIB_EXPDEPS = \
 	$(TOPLIBD)/libk5crypto$(SHLIBEXT) \
+	$(TOPLIBD)/libkadm5srv_mit$(SHLIBEXT) \
+	$(TOPLIBD)/libkdb5$(SHLIBEXT) \
 	$(TOPLIBD)/libkrb5$(SHLIBEXT)
-SHLIB_EXPLIBS= -lkrb5 -lkadm5srv_mit -lcom_err -lk5crypto -lykclient -lcurl $(SUPPORT_LIB) $(LIBS)
+SHLIB_EXPLIBS= -lkdb5 -lkrb5 -lkadm5srv_mit -lcom_err -lk5crypto -lykclient -lcurl $(SUPPORT_LIB) $(LIBS)
 
 SHLIB_DIRS=-L$(TOPLIBD)
 SHLIB_RDIRS=$(KRB5_LIBDIR)

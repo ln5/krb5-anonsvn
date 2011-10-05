@@ -110,12 +110,13 @@ struct otp_server_ctx {
 };
 
 struct otp_req_ctx {
-    struct otp_server_ctx* server_ctx;
+    /** OTP token identity.  */
     char *token_id;
-    char *blob;
-    size_t blobsize;
-    /** Saved by server_get_edata() for later use by search_db().  */
-    krb5_db_entry *client;
-    /** Authentication method currently in use.  */
+    /** Authentication method to be used for this request.  */
     struct otp_method *method;
+    /** Opaque data blob passed to authentication method.  */
+    char *blob;
+    /** Saved by otp_server_create_req_ctx() for later use by search_db().  */
+    /* FIXME: Not used, remove.*/
+    krb5_db_entry *client;
 };
