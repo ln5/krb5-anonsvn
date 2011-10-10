@@ -229,6 +229,17 @@ MKSTEMP_OBJ='$(OUTPRE)mkstemp.$(OBJEXT)'
 EXTRA_SUPPORT_SYMS="$EXTRA_SUPPORT_SYMS krb5int_mkstemp"])
 AC_SUBST(MKSTEMP_OBJ)
 AC_SUBST(MKSTEMP_ST_OBJ)
+
+AC_CHECK_FUNC(gettimeofday,
+	[GETTIMEOFDAY_ST_OBJ=
+	GETTIMEOFDAY_OBJ=
+	AC_DEFINE(HAVE_GETTIMEOFDAY, 1, [Have the gettimeofday function])
+],
+	[GETTIMEOFDAY_ST_OBJ='gettimeofday.o'
+	GETTIMEOFDAY_OBJ='$(OUTPRE)gettimeofday.$(OBJEXT)'
+	EXTRA_SUPPORT_SYMS="$EXTRA_SUPPORT_SYMS krb5int_gettimeofday"])
+AC_SUBST(GETTIMEOFDAY_OBJ)
+AC_SUBST(GETTIMEOFDAY_ST_OBJ)
 AC_SUBST(EXTRA_SUPPORT_SYMS)
 
 DECLARE_SYS_ERRLIST
@@ -1243,7 +1254,7 @@ dnl	ccapi ccapi/lib ccapi/lib/unix ccapi/server ccapi/server/unix ccapi/test
 	plugins/kdb/db2/libdb2/recno
 	plugins/kdb/db2/libdb2/test
 	plugins/kdb/hdb
-	plugins/preauth/cksum_body plugins/preauth/encrypted_challenge
+	plugins/preauth/cksum_body
 	plugins/preauth/securid_sam2
 	plugins/preauth/wpse
 	plugins/preauth/otp

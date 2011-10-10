@@ -559,7 +559,7 @@ krb5_error_code pkinit_create_td_dh_parameters
 	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN */
 	pkinit_plg_opts *opts,				/* IN */
-	krb5_data **edata);				/* OUT */
+	krb5_pa_data ***e_data_out);			/* OUT */
 
 /*
  * this function processes edata that contains TD-DH-PARAMETERS.
@@ -584,7 +584,7 @@ krb5_error_code pkinit_create_td_invalid_certificate
 	pkinit_plg_crypto_context plg_cryptoctx,	/* IN */
 	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN */
-	krb5_data **edata);				/* OUT */
+	krb5_pa_data ***e_data_out);			/* OUT */
 
 /*
  * this function creates edata that contains TD-TRUSTED-CERTIFIERS
@@ -594,7 +594,7 @@ krb5_error_code pkinit_create_td_trusted_certifiers
 	pkinit_plg_crypto_context plg_cryptoctx,	/* IN */
 	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN */
-	krb5_data **edata);				/* OUT */
+	krb5_pa_data ***e_data_out);			/* OUT */
 
 /*
  * this function processes edata that contains either
@@ -654,8 +654,5 @@ extern const size_t  krb5_pkinit_sha512_oid_len;
  * the order in which the server will pick.
  */
 extern const krb5_octet_data const *supported_kdf_alg_ids[] ;
-extern const krb5_octet_data const sha1_id;
-extern const krb5_octet_data const sha256_id;
-extern const krb5_octet_data const sha512_id;
 
 #endif	/* _PKINIT_CRYPTO_H */

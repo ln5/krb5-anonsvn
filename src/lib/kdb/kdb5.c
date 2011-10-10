@@ -2048,16 +2048,14 @@ krb5_dbe_get_strings(krb5_context context, krb5_db_entry *entry,
 
     while (next_attr(&pos, end, &mapkey, &mapval)) {
         /* Add a copy of mapkey and mapvalue to strings. */
+        newstrings = realloc(strings, (count + 1) * sizeof(*strings));
+        if (newstrings == NULL)
+            goto oom;
+        strings = newstrings;
         key = strdup(mapkey);
         val = strdup(mapval);
-        newstrings = realloc(strings, (count + 1) * sizeof(*strings));
-        if (key == NULL || val == NULL || newstrings == NULL) {
-            free(key);
-            free(val);
-            krb5_dbe_free_strings(context, strings, count);
-            return ENOMEM;
-        }
-        strings = newstrings;
+        if (key == NULL || val == NULL)
+            goto oom;
         strings[count].key = key;
         strings[count].value = val;
         count++;
@@ -2066,6 +2064,12 @@ krb5_dbe_get_strings(krb5_context context, krb5_db_entry *entry,
     *strings_out = strings;
     *count_out = count;
     return 0;
+
+oom:
+    free(key);
+    free(val);
+    krb5_dbe_free_strings(context, strings, count);
+    return ENOMEM;
 }
 
 krb5_error_code
@@ -2479,13 +2483,13 @@ krb5_error_code
 krb5_db_check_policy_as(krb5_context kcontext, krb5_kdc_req *request,
                         krb5_db_entry *client, krb5_db_entry *server,
                         krb5_timestamp kdc_time, const char **status,
-                        krb5_data *e_data)
+                        krb5_pa_data ***e_data)
 {
     krb5_error_code ret;
     kdb_vftabl *v;
 
     *status = NULL;
-    *e_data = empty_data();
+    *e_data = NULL;
     ret = get_vftabl(kcontext, &v);
     if (ret)
         return ret;
@@ -2498,13 +2502,13 @@ krb5_db_check_policy_as(krb5_context kcontext, krb5_kdc_req *request,
 krb5_error_code
 krb5_db_check_policy_tgs(krb5_context kcontext, krb5_kdc_req *request,
                          krb5_db_entry *server, krb5_ticket *ticket,
-                         const char **status, krb5_data *e_data)
+                         const char **status, krb5_pa_data ***e_data)
 {
     krb5_error_code ret;
     kdb_vftabl *v;
 
     *status = NULL;
-    *e_data = empty_data();
+    *e_data = NULL;
     ret = get_vftabl(kcontext, &v);
     if (ret)
         return ret;

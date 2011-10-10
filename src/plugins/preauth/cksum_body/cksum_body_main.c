@@ -83,7 +83,7 @@ client_process(krb5_context kcontext,
                krb5_clpreauth_moddata moddata,
                krb5_clpreauth_modreq modreq,
                krb5_get_init_creds_opt *opt,
-               krb5_clpreauth_get_data_fn client_get_data_proc,
+               krb5_clpreauth_callbacks cb,
                krb5_clpreauth_rock rock,
                krb5_kdc_req *request,
                krb5_data *encoded_request_body,
@@ -272,40 +272,29 @@ server_fini(krb5_context kcontext, krb5_kdcpreauth_moddata moddata)
 /* Obtain and return any preauthentication data (which is destined for the
  * client) which matches type data->pa_type. */
 static krb5_error_code
-server_get_edata(krb5_context kcontext,
-                 krb5_kdc_req *request,
-                 struct _krb5_db_entry_new *client,
-                 struct _krb5_db_entry_new *server,
-                 krb5_kdcpreauth_get_data_fn server_get_entry_data,
-                 krb5_kdcpreauth_moddata moddata,
-                 krb5_pa_data *data)
+server_get_edata(krb5_context kcontext, krb5_kdc_req *request,
+                 krb5_kdcpreauth_callbacks cb, krb5_kdcpreauth_rock rock,
+                 krb5_kdcpreauth_moddata moddata, krb5_pa_data *data)
 {
-    krb5_data *key_data;
-    krb5_keyblock *keys, *key;
+    krb5_keyblock *keys;
     krb5_int32 *enctypes, enctype;
     int i;
 
     /* Retrieve the client's keys. */
-    key_data = NULL;
-    if ((*server_get_entry_data)(kcontext, request, client,
-                                 krb5_kdcpreauth_keys, &key_data) != 0) {
+    if (cb->client_keys(kcontext, rock, &keys) != 0) {
 #ifdef DEBUG
         fprintf(stderr, "Error retrieving client keys.\n");
 #endif
         return KRB5KDC_ERR_PADATA_TYPE_NOSUPP;
     }
 
-    /* Count which types of keys we've got, freeing the contents, which we
-     * don't need at this point. */
-    keys = (krb5_keyblock *) key_data->data;
-    key = NULL;
-    for (i = 0; keys[i].enctype != 0; i++)
-        krb5_free_keyblock_contents(kcontext, &keys[i]);
+    /* Count which types of keys we've got. */
+    for (i = 0; keys[i].enctype != 0; i++);
 
     /* Return the list of encryption types. */
     enctypes = malloc((unsigned)i * 4);
     if (enctypes == NULL) {
-        krb5_free_data(kcontext, key_data);
+        cb->free_keys(kcontext, rock, keys);
         return ENOMEM;
     }
 #ifdef DEBUG
@@ -324,36 +313,33 @@ server_get_edata(krb5_context kcontext,
     data->pa_type = KRB5_PADATA_CKSUM_BODY_REQ;
     data->length = (i * 4);
     data->contents = (unsigned char *) enctypes;
-    krb5_free_data(kcontext, key_data);
+    cb->free_keys(kcontext, rock, keys);
     return 0;
 }
 
 /* Verify a request from a client. */
-static krb5_error_code
+static void
 server_verify(krb5_context kcontext,
-              struct _krb5_db_entry_new *client,
               krb5_data *req_pkt,
               krb5_kdc_req *request,
               krb5_enc_tkt_part *enc_tkt_reply,
               krb5_pa_data *data,
-              krb5_kdcpreauth_get_data_fn server_get_entry_data,
+              krb5_kdcpreauth_callbacks cb,
+              krb5_kdcpreauth_rock rock,
               krb5_kdcpreauth_moddata moddata,
-              krb5_kdcpreauth_modreq *modreq_out,
-              krb5_data **e_data,
-              krb5_authdata ***authz_data)
+              krb5_kdcpreauth_verify_respond_fn respond,
+              void *arg)
 {
     krb5_int32 cksumtype;
     krb5_checksum checksum;
     krb5_boolean valid;
-    krb5_data *key_data, *req_body;
+    krb5_data *req_body;
     krb5_keyblock *keys, *key;
     size_t length;
-    int i;
-    unsigned int j, cksumtypes_count;
+    unsigned int i, cksumtypes_count;
     krb5_cksumtype *cksumtypes;
     krb5_error_code status;
     struct server_stats *stats;
-    krb5_data *test_edata;
     test_svr_req_ctx *svr_req_ctx;
     krb5_authdata **my_authz_data = NULL;
 
@@ -365,7 +351,8 @@ server_verify(krb5_context kcontext,
     /* Verify the preauth data.  Start with the checksum type. */
     if (data->length < 4) {
         stats->failures++;
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+        (*respond)(arg, KRB5KDC_ERR_PREAUTH_FAILED, NULL, NULL, NULL);
+        return;
     }
     memcpy(&cksumtype, data->contents, 4);
     memset(&checksum, 0, sizeof(checksum));
@@ -379,82 +366,75 @@ server_verify(krb5_context kcontext,
                 "Is it supported?\n", checksum.checksum_type);
 #endif
         stats->failures++;
-        return KRB5KDC_ERR_SUMTYPE_NOSUPP;
+        (*respond)(arg, KRB5KDC_ERR_SUMTYPE_NOSUPP, NULL, NULL, NULL);
+        return;
     }
     if (data->length - 4 != length) {
 #ifdef DEBUG
         fprintf(stderr, "Checksum size doesn't match client packet size.\n");
 #endif
         stats->failures++;
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+        (*respond)(arg, KRB5KDC_ERR_PREAUTH_FAILED, NULL, NULL, NULL);
+        return;
     }
     checksum.length = length;
 
     /* Pull up the client's keys. */
-    key_data = NULL;
-    if ((*server_get_entry_data)(kcontext, request, client,
-                                 krb5_kdcpreauth_keys, &key_data) != 0) {
+    if (cb->client_keys(kcontext, rock, &keys) != 0) {
 #ifdef DEBUG
         fprintf(stderr, "Error retrieving client keys.\n");
 #endif
         stats->failures++;
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+        (*respond)(arg, KRB5KDC_ERR_PREAUTH_FAILED, NULL, NULL, NULL);
+        return;
     }
 
     /* Find the key which would have been used to generate the checksum. */
-    keys = (krb5_keyblock *) key_data->data;
-    key = NULL;
-    for (i = 0; keys[i].enctype != 0; i++) {
-        key = &keys[i];
+    for (key = keys; key->enctype != 0; key++) {
         cksumtypes_count = 0;
         cksumtypes = NULL;
         if (krb5_c_keyed_checksum_types(kcontext, key->enctype,
                                         &cksumtypes_count, &cksumtypes) != 0)
             continue;
-        for (j = 0; j < cksumtypes_count; j++) {
-            if (cksumtypes[j] == checksum.checksum_type)
+        for (i = 0; i < cksumtypes_count; i++) {
+            if (cksumtypes[i] == checksum.checksum_type)
                 break;
         }
         if (cksumtypes != NULL)
             krb5_free_cksumtypes(kcontext, cksumtypes);
-        if (j < cksumtypes_count) {
+        if (i < cksumtypes_count) {
 #ifdef DEBUG
             fprintf(stderr, "Found checksum key.\n");
 #endif
             break;
         }
     }
-    if ((key == NULL) || (key->enctype == 0)) {
-        for (i = 0; keys[i].enctype != 0; i++)
-            krb5_free_keyblock_contents(kcontext, &keys[i]);
-        krb5_free_data(kcontext, key_data);
+    if (key->enctype == 0) {
+        cb->free_keys(kcontext, rock, keys);
         stats->failures++;
-        return KRB5KDC_ERR_SUMTYPE_NOSUPP;
+        (*respond)(arg, KRB5KDC_ERR_SUMTYPE_NOSUPP, NULL, NULL, NULL);
+        return;
     }
 
     /* Save a copy of the key. */
-    if (krb5_copy_keyblock(kcontext, &keys[i], &key) != 0) {
-        for (i = 0; keys[i].enctype != 0; i++)
-            krb5_free_keyblock_contents(kcontext, &keys[i]);
-        krb5_free_data(kcontext, key_data);
+    if (krb5_copy_keyblock(kcontext, keys, &key) != 0) {
+        cb->free_keys(kcontext, rock, keys);
         stats->failures++;
-        return KRB5KDC_ERR_SUMTYPE_NOSUPP;
+        (*respond)(arg, KRB5KDC_ERR_SUMTYPE_NOSUPP, NULL, NULL, NULL);
+        return;
     }
-    for (i = 0; keys[i].enctype != 0; i++)
-        krb5_free_keyblock_contents(kcontext, &keys[i]);
-    krb5_free_data(kcontext, key_data);
+    cb->free_keys(kcontext, rock, keys);
 
     /* Rebuild a copy of the client's request-body.  If we were serious
      * about doing this with any chance of working interoperability, we'd
      * extract the structure directly from the req_pkt structure.  This
      * will probably work if it's us on both ends, though. */
     req_body = NULL;
-    if ((*server_get_entry_data)(kcontext, request, client,
-                                 krb5_kdcpreauth_request_body,
-                                 &req_body) != 0) {
+    if (cb->request_body(kcontext, rock, &req_body) != 0) {
         krb5_free_keyblock(kcontext, key);
         stats->failures++;
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+        (*respond)(arg, KRB5KDC_ERR_PREAUTH_FAILED, NULL, NULL, NULL);
+        return;
     }
 
 #ifdef DEBUG
@@ -482,20 +462,9 @@ server_verify(krb5_context kcontext,
             fprintf(stderr, "Checksum mismatch.\n");
         }
 #endif
-        /* Return edata to exercise code that handles edata... */
-        test_edata = malloc(sizeof(*test_edata));
-        if (test_edata != NULL) {
-            test_edata->data = malloc(20);
-            if (test_edata->data == NULL) {
-                free(test_edata);
-            } else {
-                test_edata->length = 20;
-                memset(test_edata->data, 'F', 20); /* fill it with junk */
-                *e_data = test_edata;
-            }
-        }
         stats->failures++;
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+        (*respond)(arg, KRB5KDC_ERR_PREAUTH_FAILED, NULL, NULL, NULL);
+        return;
     }
 
     /*
@@ -527,13 +496,15 @@ server_verify(krb5_context kcontext,
         my_authz_data[0] = malloc(sizeof(krb5_authdata));
         if (my_authz_data[0] == NULL) {
             free(my_authz_data);
-            return ENOMEM;
+            (*respond)(arg, ENOMEM, NULL, NULL, NULL);
+            return;
         }
         my_authz_data[0]->contents = malloc(AD_ALLOC_SIZE);
         if (my_authz_data[0]->contents == NULL) {
             free(my_authz_data[0]);
             free(my_authz_data);
-            return ENOMEM;
+            (*respond)(arg, ENOMEM, NULL, NULL, NULL);
+            return;
         }
         memset(my_authz_data[0]->contents, '\0', AD_ALLOC_SIZE);
         my_authz_data[0]->magic = KV5M_AUTHDATA;
@@ -543,24 +514,10 @@ server_verify(krb5_context kcontext,
         snprintf(my_authz_data[0]->contents + sizeof(ad_header),
                  AD_ALLOC_SIZE - sizeof(ad_header),
                  "cksum authorization data: %d bytes worth!\n", AD_ALLOC_SIZE);
-        *authz_data = my_authz_data;
 #ifdef DEBUG
         fprintf(stderr, "Returning %d bytes of authorization data\n",
                 AD_ALLOC_SIZE);
 #endif
-    }
-
-    /* Return edata to exercise code that handles edata... */
-    test_edata = malloc(sizeof(*test_edata));
-    if (test_edata != NULL) {
-        test_edata->data = malloc(20);
-        if (test_edata->data == NULL) {
-            free(test_edata);
-        } else {
-            test_edata->length = 20;
-            memset(test_edata->data, 'S', 20); /* fill it with junk */
-            *e_data = test_edata;
-        }
     }
 
     /* Return a request context to exercise code that handles it */
@@ -573,26 +530,24 @@ server_verify(krb5_context kcontext,
                 svr_req_ctx);
 #endif
     }
-    *modreq_out = (krb5_kdcpreauth_modreq)svr_req_ctx;
 
     /* Note that preauthentication succeeded. */
     enc_tkt_reply->flags |= TKT_FLG_PRE_AUTH;
     stats->successes++;
-    return 0;
+    (*respond)(arg, 0, (krb5_kdcpreauth_modreq)svr_req_ctx, NULL, my_authz_data);
 }
 
 /* Create the response for a client. */
 static krb5_error_code
 server_return(krb5_context kcontext,
               krb5_pa_data *padata,
-              struct _krb5_db_entry_new *client,
               krb5_data *req_pkt,
               krb5_kdc_req *request,
               krb5_kdc_rep *reply,
-              struct _krb5_key_data *client_key,
               krb5_keyblock *encrypting_key,
               krb5_pa_data **send_pa,
-              krb5_kdcpreauth_get_data_fn server_get_entry_data,
+              krb5_kdcpreauth_callbacks cb,
+              krb5_kdcpreauth_rock rock,
               krb5_kdcpreauth_moddata moddata,
               krb5_kdcpreauth_modreq modreq)
 {

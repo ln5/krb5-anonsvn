@@ -18,7 +18,7 @@ SYNOPSYS
          [**-q** *query*]
          [[**-c** *cache_name*] | [**-k** [**-t** *keytab* ]] | **-n**]
          [**-w** *password*] 
-         [**-s** *admin_server* [:*port*]
+         [**-s** *admin_server* [:*port*]]
 
 
 **kadmin.local**
@@ -50,7 +50,7 @@ Otherwise, the *-p* and *-k* options are used to specify the client Kerberos pri
 Once *kadmin* has determined the principal name, it requests a *kadmin/admin* Kerberos service ticket from the KDC, 
 and uses that service ticket to authenticate to KADM5.
 
-If the database is db2, the local client *kadmin.local*, is intended to run directly on the master KDC without Kerberos authentication.
+If the database is db2, the local client *kadmin.local* is intended to run directly on the master KDC without Kerberos authentication.
 The local version provides all of the functionality of the now obsolete kdb5_edit(8), except for database dump and load, 
 which is now provided by the :ref:`kdb5_util(8)` utility.
 
@@ -134,7 +134,7 @@ OPTIONS
 
               **-x** bindpwd=<bind_password>
                      specifies the password for the above mentioned binddn. It is recommended not to use this option.  
-                     Instead, the password can be stashed using the stashsrvpw command of :ref:`kdb5_ldap_util(8)`
+                     Instead, the password can be stashed using the *stashsrvpw* command of :ref:`kdb5_ldap_util(8)`
 
 
 .. _kadmin_options_end:
@@ -256,7 +256,7 @@ add_principal
 
               {- | +} **allow_postdated**
                      *-allow_postdated* prohibits this principal from obtaining postdated tickets.
-                     (Sets the KRB5_*KDB_DISALLOW_POSTDATED* flag.) *+allow_postdated* clears this flag.
+                     (Sets the *KRB5_KDB_DISALLOW_POSTDATED* flag.) *+allow_postdated* clears this flag.
 
               {- | +} **allow_forwardable**
                      *-allow_forwardable* prohibits this principal from obtaining forwardable tickets.  
@@ -482,6 +482,8 @@ purgekeys
        **purgekeys** [*-keepkvno oldest_kvno_to_keep* ] *principal*
               Purges previously retained old keys (e.g., from *change_password -keepold*) from *principal*.  
               If **-keepkvno** is specified, then only purges keys with kvnos lower than *oldest_kvno_to_keep*.
+
+.. _purgekeys_end:
 
 .. _get_principal:
 
@@ -741,7 +743,7 @@ get_policy
                      admin     15552000  0    6    2    5    17
                      kadmin:
 
-The *Reference count* is the number of principals using that policy.
+              The *Reference count* is the number of principals using that policy.
 
               ERRORS::
 
@@ -806,7 +808,6 @@ ktadd
                      The enctype-salttype pairs may be delimited with commas or whitespace.
                      The quotes are necessary for whitespace-delimited list.
                      If this option is not specified, then *supported_enctypes* from :ref:`krb5.conf` will be used.
-                     This will not function against kadmin daemons earlier than krb5-1.2. 
                      See :ref:`Supported_Encryption_Types_and_Salts` for all possible values.
 
               **-q**
@@ -867,15 +868,12 @@ ktremove
 FILES
 -----------
 
+.. note::  The first three files are specific to db2 database.
+
 ====================== =================================================
 principal.db            default name for Kerberos principal database
 <dbname>.kadm5          KADM5 administrative database. (This would be "principal.kadm5", if you use the default database name.)  Contains policy information.
 <dbname>.kadm5.lock     Lock file for the KADM5 administrative database.  This file works backwards from most other lock files. I.e., *kadmin* will exit with an error if this file does not exist.
-====================== =================================================
-
-.. note::  The above three files are specific to db2 database.
-
-====================== =================================================
 kadm5.acl               File containing list of principals and their *kadmin* administrative privileges.  See kadmind(8) for a description.
 kadm5.keytab            *keytab* file for *kadmin/admin* principal.
 kadm5.dict              file containing dictionary of strings explicitly disallowed as passwords.
