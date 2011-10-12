@@ -139,6 +139,7 @@ otp_client_fini(krb5_context context, krb5_clpreauth_moddata moddata)
         return;
     }
     free(ctx->otp);
+    free(ctx->token_id);
     free(ctx);
 }
 
@@ -168,15 +169,30 @@ otp_client_gic_opts(krb5_context context,
                                    "OTP can not be given twice.\n");
             return KRB5_PREAUTH_FAILED;
         }
-
         otp_ctx->otp = strdup(value);
         if (otp_ctx->otp == NULL) {
             krb5_set_error_message(context, KRB5_PREAUTH_FAILED,
                                    "Unable to copy OTP.\n");
             return ENOMEM;
         }
-
         CLIENT_DEBUG("Got OTP [%s].\n", otp_ctx->otp);
+        return 0;
+    }
+
+    if (strcmp(attr, "OTP_TOKENID") == 0) {
+        if (otp_ctx->token_id != NULL) {
+            krb5_set_error_message(context, KRB5_PREAUTH_FAILED,
+                                   "OTP_TOKENID can not be given twice.\n");
+            return KRB5_PREAUTH_FAILED;
+        }
+        otp_ctx->token_id = strdup(value);
+        if (otp_ctx->token_id == NULL) {
+            krb5_set_error_message(context, KRB5_PREAUTH_FAILED,
+                                   "Unable to copy OTP_TOKENID.\n");
+            return ENOMEM;
+        }
+        CLIENT_DEBUG("Got OTP_TOKENID [%s].\n", otp_ctx->token_id);
+        return 0;
     }
 
     return 0;

@@ -97,6 +97,7 @@ struct otp_method {
 
 struct otp_client_ctx {
     char *otp;
+    char *token_id;
 };
 
 struct otp_server_ctx {
