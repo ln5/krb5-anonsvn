@@ -64,7 +64,6 @@ typedef char *(*get_config_func_t)(struct otp_server_ctx *otp_ctx,
    plugin is loaded.  */
 typedef int (*otp_server_init_func_t)(struct otp_server_ctx *context,
                                       get_config_func_t get_config,
-                                      search_db_func_t search_db,
                                       struct otp_method_ftable **ftable,
                                       void **method_context);
 /* Function for cleaning up after an OTP method.  Invoked when the OTP
@@ -116,7 +115,4 @@ struct otp_req_ctx {
     struct otp_method *method;
     /** Opaque data blob passed to authentication method.  */
     char *blob;
-    /** Saved by otp_server_create_req_ctx() for later use by search_db().  */
-    /* FIXME: Not used, remove.*/
-    krb5_db_entry *client;
 };

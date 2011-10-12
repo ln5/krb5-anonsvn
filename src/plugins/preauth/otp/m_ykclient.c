@@ -80,7 +80,6 @@ verify_otp(const struct otp_req_ctx *req_ctx, const char *pw)
 int
 otp_ykclient_server_init(struct otp_server_ctx *otp_ctx,
                          get_config_func_t get_config,
-                         search_db_func_t search_db,
                          struct otp_method_ftable **ftable,
                          void **method_context)
 {
