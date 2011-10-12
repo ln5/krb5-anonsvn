@@ -27,7 +27,6 @@
  */
 
 #include <krb5/krb5.h>
-#include <kdb.h>
 #include "adm_proto.h"          /* for krb5_klog_syslog */
 
 #ifdef DEBUG
