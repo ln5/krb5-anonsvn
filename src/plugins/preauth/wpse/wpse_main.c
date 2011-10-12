@@ -90,7 +90,7 @@ client_process(krb5_context kcontext,
                krb5_clpreauth_moddata moddata,
                krb5_clpreauth_modreq modreq,
                krb5_get_init_creds_opt *opt,
-               krb5_clpreauth_get_data_fn client_get_data_proc,
+               krb5_clpreauth_callbacks cb,
                krb5_clpreauth_rock rock,
                krb5_kdc_req *request,
                krb5_data *encoded_request_body,
@@ -246,9 +246,8 @@ server_free_modreq(krb5_context kcontext,
 static krb5_error_code
 server_get_edata(krb5_context kcontext,
                  krb5_kdc_req *request,
-                 struct _krb5_db_entry_new *client,
-                 struct _krb5_db_entry_new *server,
-                 krb5_kdcpreauth_get_data_fn server_get_entry_data,
+                 krb5_kdcpreauth_callbacks cb,
+                 krb5_kdcpreauth_rock rock,
                  krb5_kdcpreauth_moddata moddata,
                  krb5_pa_data *data)
 {
@@ -259,39 +258,42 @@ server_get_edata(krb5_context kcontext,
 }
 
 /* Verify a request from a client. */
-static krb5_error_code
+static void
 server_verify(krb5_context kcontext,
-              struct _krb5_db_entry_new *client,
               krb5_data *req_pkt,
               krb5_kdc_req *request,
               krb5_enc_tkt_part *enc_tkt_reply,
               krb5_pa_data *data,
-              krb5_kdcpreauth_get_data_fn server_get_entry_data,
+              krb5_kdcpreauth_callbacks cb,
+              krb5_kdcpreauth_rock rock,
               krb5_kdcpreauth_moddata moddata,
-              krb5_kdcpreauth_modreq *modreq_out,
-              krb5_data **e_data,
-              krb5_authdata ***authz_data)
+              krb5_kdcpreauth_verify_respond_fn respond,
+              void *arg)
 {
     krb5_int32 nnonce;
-    krb5_data *test_edata;
     krb5_authdata **my_authz_data;
+    krb5_kdcpreauth_modreq modreq;
 
 #ifdef DEBUG
     fprintf(stderr, "wpse: server_verify()!\n");
 #endif
     /* Verify the preauth data. */
-    if (data->length != 4)
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+    if (data->length != 4) {
+        (*respond)(arg, KRB5KDC_ERR_PREAUTH_FAILED, NULL, NULL, NULL);
+        return;
+    }
     memcpy(&nnonce, data->contents, 4);
     nnonce = ntohl(nnonce);
-    if (memcmp(&nnonce, &request->nonce, 4) != 0)
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+    if (memcmp(&nnonce, &request->nonce, 4) != 0) {
+        (*respond)(arg, KRB5KDC_ERR_PREAUTH_FAILED, NULL, NULL, NULL);
+        return;
+    }
     /* Note that preauthentication succeeded. */
     enc_tkt_reply->flags |= TKT_FLG_PRE_AUTH;
     enc_tkt_reply->flags |= TKT_FLG_HW_AUTH;
     /* Allocate a context. Useful for verifying that we do in fact do
      * per-request cleanup. */
-    *modreq_out = malloc(4);
+    modreq = malloc(4);
 
     /*
      * Return some junk authorization data just to exercise the
@@ -322,13 +324,15 @@ server_verify(krb5_context kcontext,
         my_authz_data[0] = malloc(sizeof(krb5_authdata));
         if (my_authz_data[0] == NULL) {
             free(my_authz_data);
-            return ENOMEM;
+            (*respond)(arg, ENOMEM, modreq, NULL, NULL);
+            return;
         }
         my_authz_data[0]->contents = malloc(AD_ALLOC_SIZE);
         if (my_authz_data[0]->contents == NULL) {
             free(my_authz_data[0]);
             free(my_authz_data);
-            return ENOMEM;
+            (*respond)(arg, ENOMEM, modreq, NULL, NULL);
+            return;
         }
         memset(my_authz_data[0]->contents, '\0', AD_ALLOC_SIZE);
         my_authz_data[0]->magic = KV5M_AUTHDATA;
@@ -338,40 +342,26 @@ server_verify(krb5_context kcontext,
         snprintf(my_authz_data[0]->contents + sizeof(ad_header),
                  AD_ALLOC_SIZE - sizeof(ad_header),
                  "wpse authorization data: %d bytes worth!\n", AD_ALLOC_SIZE);
-        *authz_data = my_authz_data;
 #ifdef DEBUG
         fprintf(stderr, "Returning %d bytes of authorization data\n",
                 AD_ALLOC_SIZE);
 #endif
     }
 
-    /* Return edata to exercise code that handles edata... */
-    test_edata = malloc(sizeof(*test_edata));
-    if (test_edata != NULL) {
-        test_edata->data = malloc(20);
-        if (test_edata->data == NULL) {
-            free(test_edata);
-        } else {
-            test_edata->length = 20;
-            memset(test_edata->data, '#', 20); /* fill it with junk */
-            *e_data = test_edata;
-        }
-    }
-    return 0;
+    (*respond)(arg, 0, modreq, NULL, my_authz_data);
 }
 
 /* Create the response for a client. */
 static krb5_error_code
 server_return(krb5_context kcontext,
               krb5_pa_data *padata,
-              struct _krb5_db_entry_new *client,
               krb5_data *req_pkt,
               krb5_kdc_req *request,
               krb5_kdc_rep *reply,
-              struct _krb5_key_data *client_key,
               krb5_keyblock *encrypting_key,
               krb5_pa_data **send_pa,
-              krb5_kdcpreauth_get_data_fn server_get_entry_data,
+              krb5_kdcpreauth_callbacks cb,
+              krb5_kdcpreauth_rock rock,
               krb5_kdcpreauth_moddata moddata, krb5_kdcpreauth_modreq modreq)
 {
     /* This module does a couple of dumb things.  It tags its reply with

@@ -163,6 +163,13 @@ free_krb5_auth_pack(krb5_auth_pack **in)
     free((*in)->pkAuthenticator.paChecksum.contents);
     if ((*in)->supportedCMSTypes != NULL)
         free_krb5_algorithm_identifiers(&((*in)->supportedCMSTypes));
+    if ((*in)->supportedKDFs) {
+        krb5_octet_data **supportedKDFs = (*in)->supportedKDFs;
+        unsigned i;
+        for (i = 0; supportedKDFs[i]; i++)
+            krb5_free_octet_data(NULL, supportedKDFs[i]);
+        free(supportedKDFs);
+    }
     free(*in);
 }
 
@@ -181,6 +188,7 @@ free_krb5_pa_pk_as_rep(krb5_pa_pk_as_rep **in)
     if (*in == NULL) return;
     switch ((*in)->choice) {
     case choice_pa_pk_as_rep_dhInfo:
+        krb5_free_octet_data(NULL, (*in)->u.dh_Info.kdfID);
         free((*in)->u.dh_Info.dhSignedData.data);
         break;
     case choice_pa_pk_as_rep_encKeyPack:
@@ -347,6 +355,7 @@ init_krb5_auth_pack(krb5_auth_pack **in)
     (*in)->clientDHNonce.length = 0;
     (*in)->clientDHNonce.data = NULL;
     (*in)->pkAuthenticator.paChecksum.contents = NULL;
+    (*in)->supportedKDFs = NULL;
 }
 
 void
@@ -368,6 +377,7 @@ init_krb5_pa_pk_as_rep(krb5_pa_pk_as_rep **in)
     (*in)->u.dh_Info.dhSignedData.data = NULL;
     (*in)->u.encKeyPack.length = 0;
     (*in)->u.encKeyPack.data = NULL;
+    (*in)->u.dh_Info.kdfID = NULL;
 }
 
 void
@@ -379,16 +389,6 @@ init_krb5_pa_pk_as_rep_draft9(krb5_pa_pk_as_rep_draft9 **in)
     (*in)->u.dhSignedData.data = NULL;
     (*in)->u.encKeyPack.length = 0;
     (*in)->u.encKeyPack.data = NULL;
-}
-
-void
-init_krb5_typed_data(krb5_typed_data **in)
-{
-    (*in) = malloc(sizeof(krb5_typed_data));
-    if ((*in) == NULL) return;
-    (*in)->type = 0;
-    (*in)->length = 0;
-    (*in)->data = NULL;
 }
 
 void
@@ -422,7 +422,7 @@ pkinit_copy_krb5_octet_data(krb5_octet_data *dst, const krb5_octet_data *src)
 
 /* debugging functions */
 void
-print_buffer(unsigned char *buf, unsigned int len)
+print_buffer(const unsigned char *buf, unsigned int len)
 {
     unsigned  i = 0;
     if (len <= 0)

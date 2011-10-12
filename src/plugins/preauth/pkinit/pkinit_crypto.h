@@ -559,7 +559,7 @@ krb5_error_code pkinit_create_td_dh_parameters
 	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN */
 	pkinit_plg_opts *opts,				/* IN */
-	krb5_data **edata);				/* OUT */
+	krb5_pa_data ***e_data_out);			/* OUT */
 
 /*
  * this function processes edata that contains TD-DH-PARAMETERS.
@@ -584,7 +584,7 @@ krb5_error_code pkinit_create_td_invalid_certificate
 	pkinit_plg_crypto_context plg_cryptoctx,	/* IN */
 	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN */
-	krb5_data **edata);				/* OUT */
+	krb5_pa_data ***e_data_out);			/* OUT */
 
 /*
  * this function creates edata that contains TD-TRUSTED-CERTIFIERS
@@ -594,7 +594,7 @@ krb5_error_code pkinit_create_td_trusted_certifiers
 	pkinit_plg_crypto_context plg_cryptoctx,	/* IN */
 	pkinit_req_crypto_context req_cryptoctx,	/* IN */
 	pkinit_identity_crypto_context id_cryptoctx,	/* IN */
-	krb5_data **edata);				/* OUT */
+	krb5_pa_data ***e_data_out);			/* OUT */
 
 /*
  * this function processes edata that contains either
@@ -630,5 +630,29 @@ krb5_error_code pkinit_identity_set_prompter
 	(pkinit_identity_crypto_context id_cryptoctx,	/* IN */
 	krb5_prompter_fct prompter,			/* IN */
 	void *prompter_data);				/* IN */
+
+krb5_error_code
+pkinit_alg_agility_kdf(krb5_context context,
+                       krb5_octet_data *secret,
+                       krb5_octet_data *alg_oid,
+                       krb5_const_principal party_u_info,
+                       krb5_const_principal party_v_info,
+                       krb5_enctype enctype,
+                       krb5_octet_data *as_req,
+                       krb5_octet_data *pk_as_rep,
+                       krb5_keyblock *key_block);
+
+extern const krb5_octet krb5_pkinit_sha1_oid[];
+extern const size_t krb5_pkinit_sha1_oid_len;
+extern const krb5_octet krb5_pkinit_sha256_oid[];
+extern const size_t krb5_pkinit_sha256_oid_len;
+extern const krb5_octet krb5_pkinit_sha512_oid[];
+extern const size_t  krb5_pkinit_sha512_oid_len;
+/**
+ * An ordered set of OIDs, stored as krb5_octet_data of KDF algorithms
+ * supported by this implementation. The order of this array controls
+ * the order in which the server will pick.
+ */
+extern const krb5_octet_data const *supported_kdf_alg_ids[] ;
 
 #endif	/* _PKINIT_CRYPTO_H */

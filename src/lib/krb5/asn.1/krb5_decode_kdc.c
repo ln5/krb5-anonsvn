@@ -41,7 +41,6 @@ decode_krb5_as_req(const krb5_data *code, krb5_kdc_req **repptr)
     clear_field(rep,authorization_data.ciphertext.data);
     clear_field(rep,unenc_authdata);
     clear_field(rep,second_ticket);
-    clear_field(rep, kdc_state);
 
     check_apptag(10);
     retval = asn1_decode_kdc_req(&buf,rep);
@@ -69,7 +68,6 @@ decode_krb5_tgs_req(const krb5_data *code, krb5_kdc_req **repptr)
     clear_field(rep,authorization_data.ciphertext.data);
     clear_field(rep,unenc_authdata);
     clear_field(rep,second_ticket);
-    clear_field(rep, kdc_state);
 
     check_apptag(12);
     retval = asn1_decode_kdc_req(&buf,rep);
@@ -95,7 +93,7 @@ decode_krb5_kdc_req_body(const krb5_data *code, krb5_kdc_req **repptr)
 
     cleanup(free);
 }
-  
+
 krb5_error_code
 decode_krb5_fast_req(const krb5_data *code, krb5_fast_req **repptr)
 {
@@ -167,4 +165,3 @@ decode_krb5_pa_pk_as_req_draft9(const krb5_data *code,
     cleanup(free);
 }
 #endif /* DISABLE_PKINIT */
-

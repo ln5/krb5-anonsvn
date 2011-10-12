@@ -36,37 +36,90 @@ static krb5_int32 last_usec = 0, last_os_random = 0;
 
 static krb5_error_code make_too_big_error (krb5_data **out);
 
-krb5_error_code
-dispatch(void *cb, struct sockaddr *local_saddr, const krb5_fulladdr *from,
-         krb5_data *pkt, krb5_data **response, int is_tcp)
-{
+struct dispatch_state {
+    loop_respond_fn respond;
+    void *arg;
+    krb5_data *request;
+    int is_tcp;
+};
 
+static void
+finish_dispatch(void *arg, krb5_error_code code, krb5_data *response)
+{
+    struct dispatch_state *state = arg;
+    loop_respond_fn oldrespond;
+    void *oldarg;
+
+    assert(state);
+    oldrespond = state->respond;
+    oldarg = state->arg;
+
+    if (state->is_tcp == 0 && response &&
+        response->length > max_dgram_reply_size) {
+        krb5_free_data(kdc_context, response);
+        response = NULL;
+        code = make_too_big_error(&response);
+        if (code)
+            krb5_klog_syslog(LOG_ERR, "error constructing "
+                             "KRB_ERR_RESPONSE_TOO_BIG error: %s",
+                             error_message(code));
+    }
+
+#ifndef NOCACHE
+    /* put the response into the lookaside buffer */
+    else if (!code)
+        kdc_insert_lookaside(state->request, response);
+#endif
+
+    free(state);
+    (*oldrespond)(oldarg, code, response);
+}
+
+void
+dispatch(void *cb, struct sockaddr *local_saddr, const krb5_fulladdr *from,
+         krb5_data *pkt, int is_tcp, loop_respond_fn respond, void *arg)
+{
     krb5_error_code retval;
     krb5_kdc_req *as_req;
     krb5_int32 now, now_usec;
+    krb5_data *response = NULL;
+    struct dispatch_state *state;
+
+    state = malloc(sizeof(*state));
+    if (!state) {
+        (*respond)(arg, ENOMEM, NULL);
+        return;
+    }
+    state->respond = respond;
+    state->arg = arg;
+    state->request = pkt;
+    state->is_tcp = is_tcp;
 
     /* decode incoming packet, and dispatch */
 
 #ifndef NOCACHE
     /* try the replay lookaside buffer */
-    if (kdc_check_lookaside(pkt, response)) {
+    if (kdc_check_lookaside(pkt, &response)) {
         /* a hit! */
         const char *name = 0;
         char buf[46];
 
-        if (is_tcp == 0 && (*response)->length > max_dgram_reply_size)
-            goto too_big_for_udp;
+        if (is_tcp != 0 || response->length <= max_dgram_reply_size) {
+            name = inet_ntop (ADDRTYPE2FAMILY (from->address->addrtype),
+                              from->address->contents, buf, sizeof (buf));
+            if (name == 0)
+                name = "[unknown address type]";
+            krb5_klog_syslog(LOG_INFO,
+                             "DISPATCH: repeated (retransmitted?) request "
+                             "from %s, resending previous response",
+                             name);
+        }
 
-        name = inet_ntop (ADDRTYPE2FAMILY (from->address->addrtype),
-                          from->address->contents, buf, sizeof (buf));
-        if (name == 0)
-            name = "[unknown address type]";
-        krb5_klog_syslog(LOG_INFO,
-                         "DISPATCH: repeated (retransmitted?) request from %s, resending previous response",
-                         name);
-        return 0;
+        finish_dispatch(state, 0, response);
+        return;
     }
 #endif
+
     retval = krb5_crypto_us_timeofday(&now, &now_usec);
     if (retval == 0) {
         krb5_int32 usec_difference = now_usec-last_usec;
@@ -89,7 +142,7 @@ dispatch(void *cb, struct sockaddr *local_saddr, const krb5_fulladdr *from,
     /* try TGS_REQ first; they are more common! */
 
     if (krb5_is_tgs_req(pkt)) {
-        retval = process_tgs_req(pkt, from, response);
+        retval = process_tgs_req(pkt, from, &response);
     } else if (krb5_is_as_req(pkt)) {
         if (!(retval = decode_krb5_as_req(pkt, &as_req))) {
             /*
@@ -98,32 +151,16 @@ dispatch(void *cb, struct sockaddr *local_saddr, const krb5_fulladdr *from,
              * process_as_req frees the request if it is called
              */
             if (!(retval = setup_server_realm(as_req->server))) {
-                retval = process_as_req(as_req, pkt, from, response);
+                process_as_req(as_req, pkt, from, finish_dispatch, state);
+                return;
             }
-            else            krb5_free_kdc_req(kdc_context, as_req);
+            else
+                krb5_free_kdc_req(kdc_context, as_req);
         }
-    }
-    else
+    } else
         retval = KRB5KRB_AP_ERR_MSG_TYPE;
-#ifndef NOCACHE
-    /* put the response into the lookaside buffer */
-    if (!retval)
-        kdc_insert_lookaside(pkt, *response);
-#endif
 
-    if (is_tcp == 0 && *response != NULL &&
-        (*response)->length > max_dgram_reply_size) {
-    too_big_for_udp:
-        krb5_free_data(kdc_context, *response);
-        retval = make_too_big_error(response);
-        if (retval) {
-            krb5_klog_syslog(LOG_ERR,
-                             "error constructing KRB_ERR_RESPONSE_TOO_BIG error: %s",
-                             error_message(retval));
-        }
-    }
-
-    return retval;
+    finish_dispatch(state, retval, response);
 }
 
 static krb5_error_code

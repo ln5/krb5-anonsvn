@@ -69,7 +69,7 @@
 
 /* This version will be incremented when incompatible changes are made to the
  * KDB API, and will be kept in sync with the libkdb major version. */
-#define KRB5_KDB_API_VERSION 5
+#define KRB5_KDB_API_VERSION 6
 
 /* Salt types */
 #define KRB5_KDB_SALTTYPE_NORMAL        0
@@ -144,6 +144,13 @@ typedef struct _krb5_tl_data {
     krb5_ui_2             tl_data_length;
     krb5_octet          * tl_data_contents;
 } krb5_tl_data;
+
+/* String attributes (currently stored inside tl-data) map C string keys to
+ * values.  They can be set via kadmin and consumed by KDC plugins. */
+typedef struct krb5_string_attr_st {
+    char *key;
+    char *value;
+} krb5_string_attr;
 
 /*
  * If this ever changes up the version number and make the arrays be as
@@ -234,6 +241,10 @@ typedef struct __krb5_key_salt_tuple {
 #define KRB5_TL_MKVNO                   0x0008
 #define KRB5_TL_ACTKVNO                 0x0009
 #define KRB5_TL_MKEY_AUX                0x000a
+
+/* String attributes may not always be represented in tl-data.  kadmin clients
+ * must use the get_strings and set_string RPCs. */
+#define KRB5_TL_STRING_ATTRS            0x000b
 
 #define KRB5_TL_PAC_LOGON_INFO          0x0100 /* NDR encoded validation info */
 #define KRB5_TL_SERVER_REFERRAL         0x0200 /* ASN.1 encoded ServerReferralInfo */
@@ -538,6 +549,23 @@ krb5_dbe_lookup_last_admin_unlock( krb5_context          context,
                                    krb5_db_entry       * entry,
                                    krb5_timestamp      * stamp);
 
+/* Retrieve the set of string attributes in entry, in no particular order.
+ * Free *strings_out with krb5_dbe_free_strings when done. */
+krb5_error_code
+krb5_dbe_get_strings(krb5_context context, krb5_db_entry *entry,
+                     krb5_string_attr **strings_out, int *count_out);
+
+/* Retrieve a single string attribute from entry, or NULL if there is no
+ * attribute for key.  Free *value_out with krb5_dbe_free_string when done. */
+krb5_error_code
+krb5_dbe_get_string(krb5_context context, krb5_db_entry *entry,
+                    const char *key, char **value_out);
+
+/* Change or add a string attribute in entry, or delete it if value is NULL. */
+krb5_error_code
+krb5_dbe_set_string(krb5_context context, krb5_db_entry *entry,
+                    const char *key, const char *value);
+
 krb5_error_code
 krb5_dbe_delete_tl_data( krb5_context    context,
                          krb5_db_entry * entry,
@@ -612,14 +640,14 @@ krb5_error_code krb5_db_check_policy_as(krb5_context kcontext,
                                         krb5_db_entry *server,
                                         krb5_timestamp kdc_time,
                                         const char **status,
-                                        krb5_data *e_data);
+                                        krb5_pa_data ***e_data);
 
 krb5_error_code krb5_db_check_policy_tgs(krb5_context kcontext,
                                          krb5_kdc_req *request,
                                          krb5_db_entry *server,
                                          krb5_ticket *ticket,
                                          const char **status,
-                                         krb5_data *e_data);
+                                         krb5_pa_data ***e_data);
 
 void krb5_db_audit_as_req(krb5_context kcontext, krb5_kdc_req *request,
                           krb5_db_entry *client, krb5_db_entry *server,
@@ -741,6 +769,12 @@ krb5_dbe_free_mkey_aux_list(krb5_context, krb5_mkey_aux_node *);
 void
 krb5_dbe_free_tl_data(krb5_context, krb5_tl_data *);
 
+void
+krb5_dbe_free_strings(krb5_context, krb5_string_attr *, int count);
+
+void
+krb5_dbe_free_string(krb5_context, char *);
+
 #define KRB5_KDB_DEF_FLAGS      0
 
 #define KDB_MAX_DB_NAME                 128
@@ -762,7 +796,7 @@ krb5_dbe_free_tl_data(krb5_context, krb5_tl_data *);
  * This number indicates the date of the last incompatible change to the DAL.
  * The maj_ver field of the module's vtable structure must match this version.
  */
-#define KRB5_KDB_DAL_MAJOR_VERSION 2
+#define KRB5_KDB_DAL_MAJOR_VERSION 3
 
 /*
  * A krb5_context can hold one database object.  Modules should use
@@ -1235,7 +1269,7 @@ typedef struct _kdb_vftabl {
                                        krb5_db_entry *server,
                                        krb5_timestamp kdc_time,
                                        const char **status,
-                                       krb5_data *e_data);
+                                       krb5_pa_data ***e_data);
 
     /*
      * Optional: Perform a policy check on a TGS request, in addition to the
@@ -1252,7 +1286,7 @@ typedef struct _kdb_vftabl {
                                         krb5_db_entry *server,
                                         krb5_ticket *ticket,
                                         const char **status,
-                                        krb5_data *e_data);
+                                        krb5_pa_data ***e_data);
 
     /*
      * Optional: This method informs the module of a successful or unsuccessful

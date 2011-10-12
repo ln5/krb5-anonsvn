@@ -181,6 +181,7 @@ Scripts may use the following functions and variables:
   - ktutil
   - kinit
   - klist
+  - kswitch
   - kvno
   - kdestroy
   - kpasswd
@@ -346,6 +347,7 @@ def password(name):
 # prints messages to help developers debug the problem.
 def _onexit():
     global _daemons, _success, verbose
+    global _debug, _stop_before, _stop_after, _shell_before, _shell_after
     if _daemons is None:
         # In Python 2.5, if we exit as a side-effect of importing
         # k5test, _onexit will execute in an empty global namespace.
@@ -354,6 +356,10 @@ def _onexit():
         # daemons have been launched and that we don't really need to
         # amend the error message.  The bug is fixed in Python 2.6.
         return
+    if _debug or _stop_before or _stop_after or _shell_before or _shell_after:
+        # Wait before killing daemons in case one is being debugged.
+        sys.stdout.write('*** Press return to kill daemons and exit script: ')
+        sys.stdin.readline()
     for proc in _daemons:
         os.kill(proc.pid, signal.SIGTERM)
     if not _success:
@@ -408,6 +414,23 @@ def _find_plugins():
             return dir
     fail('Cannot locate plugins; run "make fake-install" at %s.' % buildtop)
 
+# Return the local hostname as it will be canonicalized by
+# krb5_sname_to_principal.  We can't simply use socket.getfqdn()
+# because it explicitly prefers results containing periods and
+# krb5_sname_to_principal doesn't care.
+def _get_hostname():
+    hostname = socket.gethostname()
+    try:
+        ai = socket.getaddrinfo(hostname, None, 0, 0, 0,
+                                socket.AI_CANONNAME | socket.AI_ADDRCONFIG)
+    except socket.gaierror, (error, errstr):
+        fail('Local hostname "%s" does not resolve: %s.' % (hostname, errstr))
+    (family, socktype, proto, canonname, sockaddr) = ai[0]
+    try:
+        name = socket.getnameinfo(sockaddr, socket.NI_NAMEREQD)
+    except socket.gaierror:
+        return canonname.lower()
+    return name[0].lower()
 
 # Parse command line arguments, setting global option variables.  Also
 # sets the global variable args to the positional arguments, which may
@@ -1046,8 +1069,7 @@ buildtop = _find_buildtop()
 srctop = _find_srctop()
 plugins = _find_plugins()
 _runenv = _import_runenv()
-# This gets used for principal names, so force it to lower case.
-hostname = socket.getfqdn().lower()
+hostname = _get_hostname()
 null_input = open(os.devnull, 'r')
 
 krb5kdc = os.path.join(buildtop, 'kdc', 'krb5kdc')
@@ -1058,6 +1080,7 @@ kdb5_util = os.path.join(buildtop, 'kadmin', 'dbutil', 'kdb5_util')
 ktutil = os.path.join(buildtop, 'kadmin', 'ktutil', 'ktutil')
 kinit = os.path.join(buildtop, 'clients', 'kinit', 'kinit')
 klist = os.path.join(buildtop, 'clients', 'klist', 'klist')
+kswitch = os.path.join(buildtop, 'clients', 'kswitch', 'kswitch')
 kvno = os.path.join(buildtop, 'clients', 'kvno', 'kvno')
 kdestroy = os.path.join(buildtop, 'clients', 'kdestroy', 'kdestroy')
 kpasswd = os.path.join(buildtop, 'clients', 'kpasswd', 'kpasswd')

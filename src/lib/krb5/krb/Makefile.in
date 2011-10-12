@@ -77,6 +77,8 @@ STLIBOBJS= \
 	plugin.o	\
 	pr_to_salt.o	\
 	preauth2.o	\
+	preauth_ec.o	\
+	preauth_encts.o	\
 	gic_opt_set_pa.o	\
 	princ_comp.o	\
 	privsafe.o	\
@@ -180,6 +182,8 @@ OBJS=	$(OUTPRE)addr_comp.$(OBJEXT)	\
 	$(OUTPRE)plugin.$(OBJEXT)	\
 	$(OUTPRE)pr_to_salt.$(OBJEXT)	\
 	$(OUTPRE)preauth2.$(OBJEXT)	\
+	$(OUTPRE)preauth_ec.$(OBJEXT)	\
+	$(OUTPRE)preauth_encts.$(OBJEXT)	\
 	$(OUTPRE)gic_opt_set_pa.$(OBJEXT)	\
 	$(OUTPRE)princ_comp.$(OBJEXT)	\
 	$(OUTPRE)privsafe.$(OBJEXT)	\
@@ -283,6 +287,8 @@ SRCS=	$(srcdir)/addr_comp.c	\
 	$(srcdir)/plugin.c	\
 	$(srcdir)/pr_to_salt.c	\
 	$(srcdir)/preauth2.c	\
+	$(srcdir)/preauth_ec.c	\
+	$(srcdir)/preauth_encts.c	\
 	$(srcdir)/gic_opt_set_pa.c	\
 	$(srcdir)/princ_comp.c	\
 	$(srcdir)/privsafe.c	\

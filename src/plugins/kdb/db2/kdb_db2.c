@@ -684,7 +684,7 @@ ctx_create_db(krb5_context context, krb5_db2_context *dbc)
         return retval;
 
     dbc->db_lf_file = open(dbc->db_lf_name, O_CREAT | O_RDWR | O_TRUNC,
-                              0600);
+                           0600);
     if (dbc->db_lf_file < 0) {
         retval = errno;
         goto cleanup;
@@ -1410,7 +1410,7 @@ krb5_error_code
 krb5_db2_check_policy_as(krb5_context kcontext, krb5_kdc_req *request,
                          krb5_db_entry *client, krb5_db_entry *server,
                          krb5_timestamp kdc_time, const char **status,
-                         krb5_data *e_data)
+                         krb5_pa_data ***e_data)
 {
     krb5_error_code retval;
 

@@ -1136,12 +1136,13 @@ kadmin_addprinc_usage()
 {
     fprintf(stderr, _("usage: add_principal [options] principal\n"));
     fprintf(stderr, _("\toptions are:\n"));
-    fprintf(stderr, _("\t\t[-x db_princ_args]* [-expire expdate] "
-            "[-pwexpire pwexpdate] [-maxlife maxtixlife]\n"
-            "\t\t[-kvno kvno] [-policy policy] [-clearpolicy] [-randkey]\n"
-            "\t\t[-pw password] [-maxrenewlife maxrenewlife]\n"
-                      "\t\t[-e keysaltlist]\n\t\t[{+|-}attribute]\n")
-    );
+    fprintf(stderr,
+            _("\t\t[-x db_princ_args]* [-expire expdate] "
+              "[-pwexpire pwexpdate] [-maxlife maxtixlife]\n"
+              "\t\t[-kvno kvno] [-policy policy] [-clearpolicy] [-randkey]\n"
+              "\t\t[-pw password] [-maxrenewlife maxrenewlife]\n"
+              "\t\t[-e keysaltlist]\n\t\t[{+|-}attribute]\n")
+        );
     fprintf(stderr, _("\tattributes are:\n"));
     fprintf(stderr,
             _("\t\tallow_postdated allow_forwardable allow_tgs_req "
@@ -1892,6 +1893,133 @@ kadmin_purgekeys(int argc, char *argv[])
     }
 
     printf(_("Old keys for principal \"%s\" purged.\n"), canon);
+cleanup:
+    krb5_free_principal(context, princ);
+    free(canon);
+    return;
+}
+
+void
+kadmin_getstrings(int argc, char *argv[])
+{
+    kadm5_ret_t retval;
+    char *pname, *canon = NULL;
+    krb5_principal princ = NULL;
+    krb5_string_attr *strings = NULL;
+    int count, i;
+
+    if (argc != 2) {
+        fprintf(stderr, _("usage: get_strings principal\n"));
+        return;
+    }
+    pname = argv[1];
+
+    retval = kadmin_parse_name(pname, &princ);
+    if (retval) {
+        com_err("get_strings", retval, _("while parsing principal"));
+        return;
+    }
+
+    retval = krb5_unparse_name(context, princ, &canon);
+    if (retval) {
+        com_err("get_strings", retval, _("while canonicalizing principal"));
+        goto cleanup;
+    }
+
+    retval = kadm5_get_strings(handle, princ, &strings, &count);
+    if (retval) {
+        com_err("get_strings", retval,
+                _("while getting attributes for principal \"%s\""), canon);
+        goto cleanup;
+    }
+
+    if (count == 0)
+        printf(_("(No string attributes.)\n"));
+    for (i = 0; i < count; i++)
+        printf("%s: %s\n", strings[i].key, strings[i].value);
+    kadm5_free_strings(handle, strings, count);
+
+cleanup:
+    krb5_free_principal(context, princ);
+    free(canon);
+    return;
+}
+
+void
+kadmin_setstring(int argc, char *argv[])
+{
+    kadm5_ret_t retval;
+    char *pname, *canon = NULL, *key, *value;
+    krb5_principal princ = NULL;
+
+    if (argc != 4) {
+        fprintf(stderr, _("usage: set_string principal key value\n"));
+        return;
+    }
+    pname = argv[1];
+    key = argv[2];
+    value = argv[3];
+
+    retval = kadmin_parse_name(pname, &princ);
+    if (retval) {
+        com_err("set_string", retval, _("while parsing principal"));
+        return;
+    }
+
+    retval = krb5_unparse_name(context, princ, &canon);
+    if (retval) {
+        com_err("set_string", retval, _("while canonicalizing principal"));
+        goto cleanup;
+    }
+
+    retval = kadm5_set_string(handle, princ, key, value);
+    if (retval) {
+        com_err("set_string", retval,
+                _("while setting attribute on principal \"%s\""), canon);
+        goto cleanup;
+    }
+
+    printf(_("Attribute set for principal \"%s\".\n"), canon);
+cleanup:
+    krb5_free_principal(context, princ);
+    free(canon);
+    return;
+}
+
+void
+kadmin_delstring(int argc, char *argv[])
+{
+    kadm5_ret_t retval;
+    char *pname, *canon = NULL, *key;
+    krb5_principal princ = NULL;
+
+    if (argc != 3) {
+        fprintf(stderr, _("usage: del_string principal key\n"));
+        return;
+    }
+    pname = argv[1];
+    key = argv[2];
+
+    retval = kadmin_parse_name(pname, &princ);
+    if (retval) {
+        com_err("delstring", retval, _("while parsing principal"));
+        return;
+    }
+
+    retval = krb5_unparse_name(context, princ, &canon);
+    if (retval) {
+        com_err("del_string", retval, _("while canonicalizing principal"));
+        goto cleanup;
+    }
+
+    retval = kadm5_set_string(handle, princ, key, NULL);
+    if (retval) {
+        com_err("del_string", retval,
+                _("while deleting attribute from principal \"%s\""), canon);
+        goto cleanup;
+    }
+
+    printf(_("Attribute removed from principal \"%s\".\n"), canon);
 cleanup:
     krb5_free_principal(context, princ);
     free(canon);

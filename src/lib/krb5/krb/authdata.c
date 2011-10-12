@@ -71,7 +71,7 @@ k5_ad_init_modules(krb5_context kcontext,
     int j, k = *module_count;
     krb5_error_code code;
     void *plugin_context = NULL;
-    void **rcpp;
+    void **rcpp = NULL;
 
     if (table->ad_type_list == NULL) {
 #ifdef DEBUG
@@ -1199,7 +1199,7 @@ krb5_ser_authdata_context_init(krb5_context kcontext)
 
 krb5_error_code
 krb5int_copy_authdatum(krb5_context context,
-               const krb5_authdata *inad, krb5_authdata **outad)
+                       const krb5_authdata *inad, krb5_authdata **outad)
 {
     krb5_authdata *tmpad;
 

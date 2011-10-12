@@ -372,9 +372,9 @@ typedef INT64_TYPE krb5_int64;
 #define KDC_ERR_DIGEST_IN_SIGNED_DATA_NOT_ACCEPTED 80 /* bad digest algorithm in SignedData */
 #define KDC_ERR_PUBLIC_KEY_ENCRYPTION_NOT_SUPPORTED 81
 #define KRB_AP_ERR_IAKERB_KDC_NOT_FOUND         85 /* The IAKERB proxy could
-not find a KDC */
+                                                      not find a KDC */
 #define KRB_AP_ERR_IAKERB_KDC_NO_RESPONSE       86 /* The KDC did not respond
-to the IAKERB proxy */
+                                                      to the IAKERB proxy */
 
 /*
  * This structure is returned in the e-data field of the KRB-ERROR
@@ -1378,7 +1378,8 @@ struct plugin_interface {
 #define PLUGIN_INTERFACE_KADM5_HOOK  1
 #define PLUGIN_INTERFACE_CLPREAUTH   2
 #define PLUGIN_INTERFACE_KDCPREAUTH  3
-#define PLUGIN_NUM_INTERFACES        4
+#define PLUGIN_INTERFACE_CCSELECT    4
+#define PLUGIN_NUM_INTERFACES        5
 
 /* Retrieve the plugin module of type interface_id and name modname,
  * storing the result into module. */
@@ -1418,6 +1419,7 @@ struct _kdb5_dal_handle;        /* private, in kdb5.h */
 typedef struct _kdb5_dal_handle kdb5_dal_handle;
 struct _kdb_log_context;
 typedef struct krb5_preauth_context_st krb5_preauth_context;
+struct ccselect_module_handle;
 struct _krb5_context {
     krb5_magic      magic;
     krb5_enctype    *in_tkt_etypes;
@@ -1457,6 +1459,9 @@ struct _krb5_context {
 
     /* preauth module stuff */
     krb5_preauth_context *preauth_context;
+
+    /* cache module stuff */
+    struct ccselect_module_handle **ccselect_handles;
 
     /* error detail info */
     struct errinfo err;
@@ -2122,7 +2127,7 @@ void krb5int_free_srv_dns_data(struct srv_dns_entry *);
 /* To keep happy libraries which are (for now) accessing internal stuff */
 
 /* Make sure to increment by one when changing the struct */
-#define KRB5INT_ACCESS_STRUCT_VERSION 17
+#define KRB5INT_ACCESS_STRUCT_VERSION 18
 
 #ifndef ANAME_SZ
 struct ktext;                   /* from krb.h, for krb524 support */
@@ -2157,17 +2162,6 @@ typedef struct _krb5int_access {
     krb5_error_code
     (*asn1_ldap_decode_sequence_of_keys)(krb5_data *in,
                                          ldap_seqof_key_data **);
-
-    /* Used for encrypted challenge fast factor*/
-    krb5_error_code (*encode_enc_data)(const krb5_enc_data *, krb5_data **);
-    krb5_error_code (*decode_enc_data)(const krb5_data *, krb5_enc_data **);
-    void (KRB5_CALLCONV *free_enc_data)(krb5_context, krb5_enc_data *);
-    krb5_error_code (*encode_enc_ts)(const krb5_pa_enc_ts *, krb5_data **);
-    krb5_error_code (*decode_enc_ts)(const krb5_data *, krb5_pa_enc_ts **);
-    void (KRB5_CALLCONV *free_enc_ts)(krb5_context, krb5_pa_enc_ts *);
-    krb5_error_code
-    (*encrypt_helper)(krb5_context, const krb5_keyblock *, krb5_keyusage,
-                      const krb5_data *, krb5_enc_data *);
 
     /*
      * pkinit asn.1 encode/decode functions
@@ -2367,6 +2361,7 @@ struct _krb5_cc_ops {
                                                 krb5_timestamp *);
     krb5_error_code (KRB5_CALLCONV *lock)(krb5_context, krb5_ccache);
     krb5_error_code (KRB5_CALLCONV *unlock)(krb5_context, krb5_ccache);
+    krb5_error_code (KRB5_CALLCONV *switch_to)(krb5_context, krb5_ccache);
 };
 
 extern const krb5_cc_ops *krb5_cc_dfl_ops;
@@ -2632,6 +2627,10 @@ krb5_cc_register(krb5_context, const krb5_cc_ops *, krb5_boolean );
 krb5_error_code krb5_walk_realm_tree(krb5_context, const krb5_data *,
                                      const krb5_data *, krb5_principal **,
                                      int);
+
+krb5_error_code
+k5_client_realm_path(krb5_context context, const krb5_data *client,
+                     const krb5_data *server, krb5_data **rpath_out);
 
 krb5_error_code
 krb5_auth_con_set_safe_cksumtype(krb5_context, krb5_auth_context,

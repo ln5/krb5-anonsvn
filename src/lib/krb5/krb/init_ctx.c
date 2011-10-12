@@ -103,7 +103,7 @@ krb5int_init_context_kdc(krb5_context *context)
     return krb5_init_context_profile(NULL, KRB5_INIT_CONTEXT_KDC, context);
 }
 
-krb5_error_code
+krb5_error_code KRB5_CALLCONV
 krb5_init_context_profile(profile_t profile, krb5_flags flags,
                           krb5_context *context_out)
 {
@@ -143,7 +143,7 @@ krb5_init_context_profile(profile_t profile, krb5_flags flags,
      * The context being NULL is ok.
      */
     krb5_win_ccdll_load(ctx);
-p
+
     /*
      * krb5_vercheck() is defined in win_glue.c, and this is
      * where we handle the timebomb and version server checks.
@@ -288,6 +288,7 @@ krb5_free_context(krb5_context ctx)
         ctx->trace_callback(ctx, NULL, ctx->trace_callback_data);
 #endif
 
+    k5_ccselect_free_context(ctx);
     k5_plugin_free_context(ctx);
     free(ctx->plugin_base_dir);
 

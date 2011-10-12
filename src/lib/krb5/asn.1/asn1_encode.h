@@ -89,8 +89,12 @@ asn1_error_code asn1_encode_octetstring(asn1buf *buf, unsigned int len,
  */
 #define asn1_encode_charstring asn1_encode_octetstring
 
+/**
+ * Encode @a val, an object identifier in compressed DER form without a tag or
+ * length. This function adds the OID tag and length.
+ */
 asn1_error_code asn1_encode_oid(asn1buf *buf, unsigned int len,
-                                const asn1_octet *val, unsigned int *retlen);
+                                const void *val, unsigned int *retlen);
 /*
  * requires  *buf is allocated
  * modifies  *buf, *retlen
@@ -294,8 +298,8 @@ struct atype_info {
     /* atype_field */
     const struct field_info *field;
     /* atype_tagged_thing */
-    unsigned int tagval : 8, tagtype : 8;
-    /* atype_[u]int */
+    unsigned int tagval : 8, tagtype : 8, construction:8;
+        /* atype_[u]int */
     asn1_intmax (*loadint)(const void *);
     asn1_uintmax (*loaduint)(const void *);
 };
@@ -396,27 +400,27 @@ struct atype_info {
         &aux_seqinfo_##DESCNAME,                                \
     }
 /* Integer types.  */
-#define DEFINTTYPE(DESCNAME, CTYPENAME)                         \
-    typedef CTYPENAME aux_typedefname_##DESCNAME;               \
-    static asn1_intmax loadint_##DESCNAME(const void *p)        \
-    {                                                           \
-        assert(sizeof(CTYPENAME) <= sizeof(asn1_intmax));       \
-        return *(const aux_typedefname_##DESCNAME *)p;          \
-    }                                                           \
-    const struct atype_info krb5int_asn1type_##DESCNAME = {     \
-        atype_int, sizeof(CTYPENAME), 0, 0, 0, 0, 0, 0, 0, 0,   \
-        loadint_##DESCNAME, 0,                                  \
+#define DEFINTTYPE(DESCNAME, CTYPENAME)                                 \
+    typedef CTYPENAME aux_typedefname_##DESCNAME;                       \
+    static asn1_intmax loadint_##DESCNAME(const void *p)                \
+    {                                                                   \
+        assert(sizeof(CTYPENAME) <= sizeof(asn1_intmax));               \
+        return *(const aux_typedefname_##DESCNAME *)p;                  \
+    }                                                                   \
+    const struct atype_info krb5int_asn1type_##DESCNAME = {             \
+        atype_int, sizeof(CTYPENAME), 0, 0, 0, 0, 0, 0, 0, 0, 0,        \
+        loadint_##DESCNAME, 0,                                          \
     }
-#define DEFUINTTYPE(DESCNAME, CTYPENAME)                        \
-    typedef CTYPENAME aux_typedefname_##DESCNAME;               \
-    static asn1_uintmax loaduint_##DESCNAME(const void *p)      \
-    {                                                           \
-        assert(sizeof(CTYPENAME) <= sizeof(asn1_uintmax));      \
-        return *(const aux_typedefname_##DESCNAME *)p;          \
-    }                                                           \
-    const struct atype_info krb5int_asn1type_##DESCNAME = {     \
-        atype_uint, sizeof(CTYPENAME), 0, 0, 0, 0, 0, 0, 0, 0,  \
-        0, loaduint_##DESCNAME,                                 \
+#define DEFUINTTYPE(DESCNAME, CTYPENAME)                         \
+    typedef CTYPENAME aux_typedefname_##DESCNAME;                \
+    static asn1_uintmax loaduint_##DESCNAME(const void *p)       \
+    {                                                            \
+        assert(sizeof(CTYPENAME) <= sizeof(asn1_uintmax));       \
+        return *(const aux_typedefname_##DESCNAME *)p;           \
+    }                                                            \
+    const struct atype_info krb5int_asn1type_##DESCNAME = {      \
+        atype_uint, sizeof(CTYPENAME), 0, 0, 0, 0, 0, 0, 0, 0,   \
+        0, 0, loaduint_##DESCNAME,                               \
     }
 /* Pointers to other types, to be encoded as those other types.  */
 #ifdef POINTERS_ARE_ALL_THE_SAME
@@ -488,7 +492,19 @@ struct atype_info {
     typedef aux_typedefname_##BASEDESC aux_typedefname_##DESCNAME;      \
     const struct atype_info krb5int_asn1type_##DESCNAME = {             \
         atype_tagged_thing, sizeof(aux_typedefname_##DESCNAME),         \
-        0, 0, 0, &krb5int_asn1type_##BASEDESC, 0, 0, TAG, APPLICATION   \
+        0, 0, 0, &krb5int_asn1type_##BASEDESC, 0, 0, TAG, APPLICATION,  \
+        CONSTRUCTED                                                     \
+    }
+
+/**
+ * An encoding wrapped in an octet string
+ */
+#define DEFOCTETWRAPTYPE(DESCNAME, BASEDESC)                            \
+    typedef aux_typedefname_##BASEDESC aux_typedefname_##DESCNAME;      \
+    const struct atype_info krb5int_asn1type_##DESCNAME = {             \
+        atype_tagged_thing, sizeof(aux_typedefname_##DESCNAME),         \
+        0, 0, 0, &krb5int_asn1type_##BASEDESC, 0, 0, ASN1_OCTETSTRING,  \
+        UNIVERSAL, PRIMITIVE                                            \
     }
 
 /*

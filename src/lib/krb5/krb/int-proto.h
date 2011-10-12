@@ -29,7 +29,7 @@
 
 krb5_error_code
 krb5int_tgtname(krb5_context context, const krb5_data *, const krb5_data *,
-             krb5_principal *);
+                krb5_principal *);
 
 krb5_error_code
 krb5int_libdefault_boolean(krb5_context, const krb5_data *, const char *,
@@ -52,6 +52,14 @@ krb5_preauth_supply_preauth_data(krb5_context context,
                                  krb5_gic_opt_ext *opte,
                                  const char *attr,
                                  const char *value);
+
+krb5_error_code
+clpreauth_encrypted_challenge_initvt(krb5_context context, int maj_ver,
+                                     int min_ver, krb5_plugin_vtable vtable);
+
+krb5_error_code
+clpreauth_encrypted_timestamp_initvt(krb5_context context, int maj_ver,
+                                     int min_ver, krb5_plugin_vtable vtable);
 
 krb5_error_code
 krb5int_construct_matching_creds(krb5_context context, krb5_flags options,
@@ -177,5 +185,8 @@ krb5_error_code
 krb5int_mk_setpw_req(krb5_context context, krb5_auth_context auth_context,
                      krb5_data *ap_req, krb5_principal targetprinc,
                      char *passwd, krb5_data *packet);
+
+void
+k5_ccselect_free_context(krb5_context context);
 
 #endif /* KRB5_INT_FUNC_PROTO__ */

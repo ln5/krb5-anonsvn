@@ -55,17 +55,6 @@ typedef struct gss_mech_spec_name_t {
 } gss_mech_spec_name_desc, *gss_mech_spec_name;
 
 /*
- * Credential auxiliary info, used in the credential structure
- */
-typedef struct gss_union_cred_auxinfo {
-	gss_buffer_desc		name;
-	gss_OID			name_type;
-	OM_uint32		creation_time;
-	OM_uint32		time_rec;
-	int			cred_usage;
-} gss_union_cred_auxinfo;
-
-/*
  * Set of Credentials typed on mechanism OID
  */
 typedef struct gss_cred_id_struct {
@@ -73,7 +62,6 @@ typedef struct gss_cred_id_struct {
 	int			count;
 	gss_OID			mechs_array;
 	gss_cred_id_t		*cred_array;
-	gss_union_cred_auxinfo	auxinfo;
 } gss_union_cred_desc, *gss_union_cred_t;
 
 typedef	OM_uint32 (KRB5_CALLCONV *gss_acquire_cred_with_password_sfct)(
@@ -335,12 +323,12 @@ typedef struct gss_config {
 		    OM_uint32,		/* req_output_size */
 		    OM_uint32 *		/* max_input_size */
 	 );
-    OM_uint32	     (KRB5_CALLCONV *gss_pname_to_uid)
+    OM_uint32	     (KRB5_CALLCONV *gss_localname)
 	(
 		    OM_uint32 *,        /* minor */
 		    const gss_name_t,	/* name */
-		    const gss_OID,	/* mech_type */
-		    uid_t *		/* uid */
+		    gss_const_OID,	/* mech_type */
+		    gss_buffer_t /* localname */
 	    );
 	OM_uint32		(KRB5_CALLCONV *gssspi_authorize_localname)
 	(
@@ -653,7 +641,7 @@ int gssint_mechglue_init(void);
 void gssint_mechglue_fini(void);
 #endif
 
-gss_mechanism gssint_get_mechanism (gss_OID);
+gss_mechanism gssint_get_mechanism (gss_const_OID);
 gss_mechanism_ext gssint_get_mechanism_ext(const gss_OID);
 OM_uint32 gssint_get_mech_type (gss_OID, gss_buffer_t);
 char *gssint_get_kmodName(const gss_OID);

@@ -236,6 +236,16 @@ krb5_free_data(krb5_context context, krb5_data *val)
     free(val);
 }
 
+
+void KRB5_CALLCONV
+krb5_free_octet_data(krb5_context context, krb5_octet_data *val)
+{
+    if (val == NULL)
+        return;
+    free(val->data);
+    free(val);
+}
+
 void KRB5_CALLCONV
 krb5_free_data_contents(krb5_context context, krb5_data *val)
 {
@@ -329,7 +339,6 @@ krb5_free_kdc_req(krb5_context context, krb5_kdc_req *val)
 {
     if (val == NULL)
         return;
-    assert( val->kdc_state == NULL);
     krb5_free_pa_data(context, val->padata);
     krb5_free_principal(context, val->client);
     krb5_free_principal(context, val->server);
@@ -519,6 +528,12 @@ krb5_free_unparsed_name(krb5_context context, char *val)
 {
     if (val != NULL)
         free(val);
+}
+
+void KRB5_CALLCONV
+krb5_free_string(krb5_context context, char *val)
+{
+    free(val);
 }
 
 void KRB5_CALLCONV

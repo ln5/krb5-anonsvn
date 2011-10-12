@@ -8,7 +8,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -313,7 +313,7 @@ krb5_set_trace_callback(krb5_context context, krb5_trace_callback fn,
     return 0;
 }
 
-static void
+static void KRB5_CALLCONV
 file_trace_cb(krb5_context context, const struct krb5_trace_info *info, void *data)
 {
     int *fd = data;

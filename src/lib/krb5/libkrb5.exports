@@ -79,6 +79,7 @@ encode_krb5_pa_s4u_x509_user
 encode_krb5_pa_server_referral_data
 encode_krb5_pa_svr_referral_data
 encode_krb5_padata_sequence
+encode_krb5_pkinit_supp_pub_info
 encode_krb5_predicted_sam_response
 encode_krb5_priv
 encode_krb5_pwd_data
@@ -91,9 +92,11 @@ encode_krb5_sam_challenge_2_body
 encode_krb5_sam_key
 encode_krb5_sam_response
 encode_krb5_sam_response_2
+encode_krb5_sp80056a_other_info
 encode_krb5_tgs_rep
 encode_krb5_tgs_req
 encode_krb5_ticket
+encode_krb5_typed_data
 et_asn1_error_table
 et_k524_error_table
 et_kdb5_error_table
@@ -107,6 +110,7 @@ initialize_krb5_error_table
 initialize_k5e1_error_table
 initialize_kv5m_error_table
 initialize_prof_error_table
+k5_ccselect_free_context
 k5_free_serverlist
 k5_kt_get_principal
 k5_locate_kdc
@@ -183,6 +187,7 @@ krb5_build_principal
 krb5_build_principal_alloc_va
 krb5_build_principal_ext
 krb5_build_principal_va
+krb5_cc_cache_match
 krb5_cc_close
 krb5_cc_copy_creds
 krb5_cc_default
@@ -194,6 +199,7 @@ krb5_cc_end_seq_get
 krb5_cc_file_ops
 krb5_cc_gen_new
 krb5_cc_get_config
+krb5_cc_get_full_name
 krb5_cc_get_name
 krb5_cc_get_principal
 krb5_cc_get_type
@@ -205,11 +211,14 @@ krb5_cc_remove_cred
 krb5_cc_resolve
 krb5_cc_retrieve_cred
 krb5_cc_retrieve_cred_default
+krb5_cc_select
 krb5_cc_set_config
 krb5_cc_set_default_name
 krb5_cc_set_flags
 krb5_cc_start_seq_get
 krb5_cc_store_cred
+krb5_cc_support_switch
+krb5_cc_switch
 krb5_cccol_cursor_free
 krb5_cccol_cursor_new
 krb5_cccol_cursor_next
@@ -294,6 +303,7 @@ krb5_free_keytab_entry_contents
 krb5_free_krbhst
 krb5_free_ktypes
 krb5_free_last_req
+krb5_free_octet_data
 krb5_free_pa_data
 krb5_free_pa_enc_ts
 krb5_free_pa_for_user
@@ -322,6 +332,7 @@ krb5_free_sam_response
 krb5_free_sam_response_2
 krb5_free_sam_response_2_contents
 krb5_free_sam_response_contents
+krb5_free_string
 krb5_free_tgt_creds
 krb5_free_ticket
 krb5_free_tickets
