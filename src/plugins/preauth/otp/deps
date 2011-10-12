@@ -1,1 +1,1 @@
-otp_main.o: ../fast_factor.h $(BUILDTOP)/include/autoconf.h $(BUILDTOP)/include/krb5/krb5.h $(BUILDTOP)/include/krb5/kdb.h $(top_srcdir)/include/krb5/preauth_plugin.h otp_main.c otp.h m_basicauth.c m_basicauth.h m_ykclient.c m_ykclient.h
+otp_main.o: $(BUILDTOP)/include/autoconf.h $(BUILDTOP)/include/krb5/krb5.h $(top_srcdir)/include/krb5/preauth_plugin.h otp_main.c otp.h m_basicauth.c m_basicauth.h m_ykclient.c m_ykclient.h
