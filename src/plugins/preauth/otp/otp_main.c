@@ -294,13 +294,18 @@ otp_client_process(krb5_context context,
             goto errout;
         }
 
-        if (otp_ctx->otp == NULL) {
+        if (otp_ctx == NULL) {
             CLIENT_DEBUG("Missing client context.\n");
-        } else {
-            otp_req.otp_value.data = otp_ctx->otp;
-            otp_req.otp_value.length = strlen(otp_ctx->otp);
-            otp_req.otp_keyid.data = otp_ctx->token_id;
-            otp_req.otp_keyid.length = strlen(otp_ctx->token_id);
+        }
+        else {
+            if (otp_req.otp_value.data != NULL) {
+                otp_req.otp_value.data = otp_ctx->otp;
+                otp_req.otp_value.length = strlen(otp_ctx->otp);
+            }
+            if (otp_req.otp_keyid.data != NULL) {
+                otp_req.otp_keyid.data = otp_ctx->token_id;
+                otp_req.otp_keyid.length = strlen(otp_ctx->token_id);
+            }
         }
 
         retval = encode_krb5_pa_otp_req(&otp_req, &encoded_otp_req);
