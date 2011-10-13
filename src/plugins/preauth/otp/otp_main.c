@@ -298,11 +298,11 @@ otp_client_process(krb5_context context,
             CLIENT_DEBUG("Missing client context.\n");
         }
         else {
-            if (otp_req.otp_value.data != NULL) {
+            if (otp_ctx->otp != NULL) {
                 otp_req.otp_value.data = otp_ctx->otp;
                 otp_req.otp_value.length = strlen(otp_ctx->otp);
             }
-            if (otp_req.otp_keyid.data != NULL) {
+            if (otp_ctx->token_id != NULL) {
                 otp_req.otp_keyid.data = otp_ctx->token_id;
                 otp_req.otp_keyid.length = strlen(otp_ctx->token_id);
             }
