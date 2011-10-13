@@ -426,7 +426,7 @@ otp_server_pick_token(struct otp_server_ctx *ctx,
             free(blob);
             blob = strdup(cp);
         }
-        if (strcmp(token_id, token_id_hint) == 0)
+        if (token_id_hint != NULL && strcmp(token_id, token_id_hint) == 0)
             break;
     }
 
@@ -770,11 +770,18 @@ otp_server_verify_padata(krb5_context context,
 
     /* Get OTP and potential token id hint from user.  */
     otp = strndup(otp_req->otp_value.data, otp_req->otp_value.length);
-    tokenid = strndup(otp_req->otp_keyid.data, otp_req->otp_keyid.length);
-    SERVER_DEBUG("Got tokenid hint [%s].", tokenid);
-    if (otp == NULL || tokenid == NULL) {
+    if (otp == NULL) {
         retval = ENOMEM;
         goto errout;
+    }
+    SERVER_DEBUG("Got OTP [%s].", otp);
+    if (otp_req->otp_keyid.data != NULL) {
+        tokenid = strndup(otp_req->otp_keyid.data, otp_req->otp_keyid.length);
+        if (tokenid == NULL) {
+            retval = ENOMEM;
+            goto errout;
+        }
+        SERVER_DEBUG("Got tokenid hint [%s].", tokenid);
     }
 
     /* Create request context.  */
