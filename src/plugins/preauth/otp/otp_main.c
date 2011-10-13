@@ -402,7 +402,7 @@ otp_server_pick_token(struct otp_server_ctx *ctx,
         goto out;
     }
     /* TODO: Support more than 9 OTP tokens per principal.  */
-    token_id = method_name = NULL;
+    token_id = method_name = blob = NULL;
     for (f = 0; f < 10; f++, key[9]--) {
         free_string(ctx->krb5_context, rock, val);
 
@@ -414,12 +414,18 @@ otp_server_pick_token(struct otp_server_ctx *ctx,
         cp = strtok_r(val, ":", &saveptr);
         if (cp == NULL)
             continue;
-        token_id = cp;
+        free(token_id);
+        token_id = strdup(cp);
         cp = strtok_r(NULL, ":", &saveptr);
         if (cp == NULL)
             continue;
-        method_name = cp;
-        blob = strtok_r(NULL, ":", &saveptr);
+        free(method_name);
+        method_name = strdup(cp);
+        cp = strtok_r(NULL, ":", &saveptr);
+        if (cp != NULL) {
+            free(blob);
+            blob = strdup(cp);
+        }
         if (strcmp(token_id, token_id_hint) == 0)
             break;
     }
@@ -441,18 +447,8 @@ otp_server_pick_token(struct otp_server_ctx *ctx,
         goto out;
     }
 
-    *token_id_out = strdup(token_id);
-    if (*token_id_out == NULL) {
-        retval = ENOMEM;
-        goto out;
-    }
-    if (blob != NULL) {
-        *blob_out = strdup(blob);
-        if (*blob_out == NULL) {
-            retval = ENOMEM;
-            goto out;
-        }
-    }
+    *token_id_out = token_id;
+    *blob_out = blob;
 
  out:
     free(key);
