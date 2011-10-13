@@ -1,0 +1,29 @@
+This is a FAST factor for one-time password (OTP) support implementing
+draft-ietf-krb-wg-otp-preauth-18.
+
+
+Status
+------
+- tested with tokens
+  - soft OATH tokens (oath-toolkit, "OATH Token" iPhone app)
+  - hard OATH token (Yubikey)
+  - Yubikey token in Yubikey mode
+- tested with authentication backends
+  - basic authentication over http/https (Apache + mod_authn_otp)
+  - Yubikey (yubiserve)
+
+
+Known bugs
+----------
+
+
+Missing
+-------
+- prompting for password
+- 2-pass variant
+- must-encrypt-nonce mode (i.e. not sending OTP)
+- support for connected tokens
+- PIN change
+- proper plugin functionality for OTP methods
+- decoding of otp-tokenInfo in PA-OTP-CHALLENGE
+- decoding of supportedHashAlg in OTP-TOKENINFO
