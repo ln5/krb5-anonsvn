@@ -276,6 +276,8 @@ asn1_error_code asn1_decode_iakerb_header(asn1buf *buf,
 asn1_error_code asn1_decode_iakerb_finished(asn1buf *buf,
                                             krb5_iakerb_finished *val);
 
+asn1_error_code asn1_decode_otp_tokeninfo(asn1buf *buf,
+                                          krb5_otp_tokeninfo *val);
 asn1_error_code asn1_decode_pa_otp_challenge(asn1buf *buf,
                                              krb5_pa_otp_challenge *val);
 

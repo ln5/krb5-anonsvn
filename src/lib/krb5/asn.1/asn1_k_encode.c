@@ -2160,7 +2160,7 @@ asn1_encode_typed_data(asn1buf *buf, const krb5_typed_data *val,
     asn1_cleanup();
 }
 
-/* Definitions for http://tools.ietf.org/html/draft-ietf-krb-wg-otp-preauth-14 */
+/* Definitions for draft-ietf-krb-wg-otp-preauth-18.  */
 
 DEFFNLENTYPE(oid, unsigned char *, asn1_encode_oid);
 DEFFIELDTYPE(ostring_octet_data, krb5_octet_data,
@@ -2171,22 +2171,29 @@ static const struct field_info algorithm_identifier_fields[] = {
     FIELDOF_NORM(krb5_algorithm_identifier, oid_data, algorithm, 0),
     FIELDOF_OPT(krb5_algorithm_identifier, ostring_octet_data, parameters, 1, 1),
 };
-static const struct field_info otp_keyinfo_fields[] = {
-    FIELDOF_NORM(krb5_otp_keyinfo, krb5_flags, flags, 0),
-    FIELDOF_OPT(krb5_otp_keyinfo, ostring_data, otp_vendor, 1, 1), /* FIXME: not the right type ?? */
-    FIELDOF_OPT(krb5_otp_keyinfo, ostring_data, otp_challenge, 2, 1),
-    FIELDOF_OPT(krb5_otp_keyinfo, int32, otp_length, 3, 3),
-    FIELDOF_OPT(krb5_otp_keyinfo, ostring_data, otp_keyid, 4, 4),
-    FIELDOF_OPT(krb5_otp_keyinfo, ostring_data, otp_algid, 5, 5), /* FIXME: not the right type ?? */
-    FIELDOF_OPT(krb5_otp_keyinfo, algorithm_identifier, hash_alg, 6, 6),
-    FIELDOF_OPT(krb5_otp_keyinfo, int32, iteration_count, 7, 7),
+static const struct field_info otp_tokeninfo_fields[] = {
+    FIELDOF_NORM(krb5_otp_tokeninfo, krb5_flags, flags, 0),
+    FIELDOF_OPT(krb5_otp_tokeninfo, ostring_data, otp_vendor, 1, 1), /* FIXME: not the right type ?? */
+    FIELDOF_OPT(krb5_otp_tokeninfo, ostring_data, otp_challenge, 2, 2),
+    FIELDOF_OPT(krb5_otp_tokeninfo, int32, otp_length, 3, 3),
+    FIELDOF_OPT(krb5_otp_tokeninfo, ostring_data, otp_token_id, 4, 4),
+    FIELDOF_OPT(krb5_otp_tokeninfo, ostring_data, otp_alg_id, 5, 5), /* FIXME: not the right type ?? */
+    FIELDOF_OPT(krb5_otp_tokeninfo, algorithm_identifier, supported_hash_alg, 6, 6), /* FIXME: SEQUENCE OF (!) AlgorithmIdentifier.  */
+    FIELDOF_OPT(krb5_otp_tokeninfo, int32, iteration_count, 7, 7),
 };
 
+/* TODO: OTPFormat */
+/* OTPFormat ::= INTEGER {
+       decimal(0),
+       hexadecimal(1),
+       alphanumeric(2),
+       binary(3) } */
+
 static unsigned int
-otp_keyinfo_optional (const void *p)
+otp_tokeninfo_optional (const void *p)
 {
     unsigned int optional = 0;
-    const krb5_otp_keyinfo *val = p;
+    const krb5_otp_tokeninfo *val = p;
 
     if (val->otp_vendor.data)
         optional |= (1u<<1);
@@ -2194,33 +2201,26 @@ otp_keyinfo_optional (const void *p)
         optional |= (1u<<2);
     if (val->otp_length)
         optional |= (1u<<3);
-    if (val->otp_keyid.data)
+    if (val->otp_token_id.data)
         optional |= (1u<<4);
-    if (val->otp_algid.data)
+    if (val->otp_alg_id.data)
         optional |= (1u<<5);
-    if (val->hash_alg.algorithm.data)
+    if (val->supported_hash_alg.algorithm.data)
         optional |= (1u<<6);
     if (val->iteration_count)
         optional |= (1u<<7);
     return optional;
 }
 
-DEFSEQTYPE( otp_keyinfo, krb5_otp_keyinfo, otp_keyinfo_fields, otp_keyinfo_optional);
-MAKE_FULL_ENCODER(encode_krb5_otp_keyinfo, otp_keyinfo);
-
-#define FIELDOF_OPTSEQOF_LEN(STYPE,DESC,PTRFIELD,LENFIELD,LENTYPE,TAG, OPT)     \
-    {                                                                   \
-        field_sequenceof_len,                                           \
-            OFFOF(STYPE, PTRFIELD, aux_typedefname_##DESC),             \
-            OFFOF(STYPE, LENFIELD, aux_typedefname_##LENTYPE),          \
-            TAG, OPT, &krb5int_asn1type_##DESC, &krb5int_asn1type_##LENTYPE \
-            }
+DEFSEQTYPE(otp_tokeninfo, krb5_otp_tokeninfo, otp_tokeninfo_fields,
+           otp_tokeninfo_optional);
+DEFPTRTYPE(otp_tokeninfo_ptr, otp_tokeninfo);
+MAKE_FULL_ENCODER(encode_krb5_otp_tokeninfo, otp_tokeninfo);
 
 static const struct field_info pa_otp_challenge_fields[] = {
     FIELDOF_NORM(krb5_pa_otp_challenge, ostring_data, nonce, 0),
     FIELDOF_OPT(krb5_pa_otp_challenge, ostring_data, otp_service, 1, 1), /* FIXME: not the right type ?? */
-    /* OPTIONAL according to the description of the field */
-    FIELDOF_OPTSEQOF_LEN(krb5_pa_otp_challenge, otp_keyinfo, otp_keyinfo, n_otp_keyinfo, int32, 2, 2),
+    FIELDOF_SEQOF_INT32(krb5_pa_otp_challenge, otp_tokeninfo_ptr, otp_tokeninfo, n_otp_tokeninfo, 2),
     FIELDOF_OPT(krb5_pa_otp_challenge, gstring_data, salt, 3, 3),
     FIELDOF_OPT(krb5_pa_otp_challenge, ostring_data, s2kparams, 4, 4),
 };
@@ -2233,11 +2233,6 @@ pa_otp_challenge_optional (const void *p)
 
     if (val->otp_service.data)
         optional |= (1u<<1);
-/* flags is the only mandatory field of otp_keyinfo and the value 0 is marked
- * as reserved so we take -1 to indicate that otp_keyinfo is not set  for
- * pa_otp_challenge */
-    if (val->otp_keyinfo.flags > -1)
-        optional |= (1u<<2);
     if (val->salt.data)
         optional |= (1u<<3);
     if (val->s2kparams.data)
@@ -2245,24 +2240,26 @@ pa_otp_challenge_optional (const void *p)
     return optional;
 }
 
-DEFSEQTYPE( pa_otp_challenge, krb5_pa_otp_challenge, pa_otp_challenge_fields, pa_otp_challenge_optional);
+DEFSEQTYPE(pa_otp_challenge, krb5_pa_otp_challenge, pa_otp_challenge_fields,
+           pa_otp_challenge_optional);
 MAKE_FULL_ENCODER(encode_krb5_pa_otp_challenge, pa_otp_challenge);
 
 
 static const struct field_info pa_otp_req_fields[] = {
     FIELDOF_NORM(krb5_pa_otp_req, krb5_flags, flags, 0),
     FIELDOF_OPT(krb5_pa_otp_req, ostring_data, nonce, 1, 1),
-    FIELDOF_OPT(krb5_pa_otp_req, encrypted_data, enc_data, 2, 2),  /* FIXME: not optional */
+    FIELDOF_NORM(krb5_pa_otp_req, encrypted_data, enc_data, 2),
     FIELDOF_OPT(krb5_pa_otp_req, algorithm_identifier, hash_alg, 3, 3),
     FIELDOF_OPT(krb5_pa_otp_req, int32, iteration_count, 4, 4),
     FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_value, 5, 5),
-    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_challenge, 6, 6),
-    FIELDOF_OPT(krb5_pa_otp_req, kerberos_time, otp_time, 7, 7),
-    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_counter, 8, 8),
-    FIELDOF_OPT(krb5_pa_otp_req, int32, otp_format, 9, 9), /* FIXME: not the right type  ?? */
-    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_keyid, 10, 10),
-    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_algid, 11, 11), /* FIXME: not the right type ?? */
-    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_vendor, 12, 12), /* FIXME: not the right type ?? */
+    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_pin, 6, 6),
+    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_challenge, 7, 7), /* FIXME: SIZE(1..MAX) */
+    FIELDOF_OPT(krb5_pa_otp_req, kerberos_time, otp_time, 8, 8),
+    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_counter, 9, 9),
+    FIELDOF_OPT(krb5_pa_otp_req, int32, otp_format, 10, 10), /* FIXME: Correct type is OTPFormat.  */
+    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_token_id, 11, 11),
+    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_alg_id, 12, 12), /* FIXME: Correct type is AnyURI.  */
+    FIELDOF_OPT(krb5_pa_otp_req, ostring_data, otp_vendor, 13, 13), /* FIXME: Correct type is UTF8String.  */
 };
 
 static unsigned int
@@ -2272,29 +2269,29 @@ pa_otp_req_optional (const void *p)
     const krb5_pa_otp_req *val = p;
 
     if (val->nonce.data)
-        optional |= (1u <<1);
-    if (val->enc_data.ciphertext.data)
-        optional |= (1u<<2);
+        optional |= (1u<<1);
     if (val->hash_alg.algorithm.data)
         optional |= (1u<<3);
     if (val->iteration_count)
         optional |= (1u<<4);
     if (val->otp_value.data)
         optional |= (1u<<5);
-    if (val->otp_challenge.data)
+    if (val->otp_pin.data)
         optional |= (1u<<6);
-    if (val->otp_time)
+    if (val->otp_challenge.data)
         optional |= (1u<<7);
-    if (val->otp_counter.data)
+    if (val->otp_time)
         optional |= (1u<<8);
-    if (val->otp_format)
+    if (val->otp_counter.data)
         optional |= (1u<<9);
-    if (val->otp_keyid.data)
+    if (val->otp_format)
         optional |= (1u<<10);
-    if (val->otp_algid.data)
+    if (val->otp_token_id.data)
         optional |= (1u<<11);
-    if (val->otp_vendor.data)
+    if (val->otp_alg_id.data)
         optional |= (1u<<12);
+    if (val->otp_vendor.data)
+        optional |= (1u<<13);
     return optional;
 }
 DEFSEQTYPE( pa_otp_req, krb5_pa_otp_req, pa_otp_req_fields, pa_otp_req_optional);

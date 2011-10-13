@@ -303,8 +303,8 @@ otp_client_process(krb5_context context,
                 otp_req.otp_value.length = strlen(otp_ctx->otp);
             }
             if (otp_ctx->token_id != NULL) {
-                otp_req.otp_keyid.data = otp_ctx->token_id;
-                otp_req.otp_keyid.length = strlen(otp_ctx->token_id);
+                otp_req.otp_token_id.data = otp_ctx->token_id;
+                otp_req.otp_token_id.length = strlen(otp_ctx->token_id);
             }
         }
 
@@ -659,14 +659,21 @@ otp_server_get_edata(krb5_context context,
     *((uint32_t *) (otp_challenge.nonce.data + armor_key->length + 4)) =
         htonl(now_usec);
 
-    /* otp_challenge.otp_keyinfo.flags |= FIXME->keyinfo_flags; */
-    otp_challenge.otp_keyinfo.flags = -1;
+    otp_challenge.n_otp_tokeninfo = 1;
+    otp_challenge.otp_tokeninfo = calloc(otp_challenge.n_otp_tokeninfo,
+                                         sizeof(krb5_otp_tokeninfo));
+    if (otp_challenge.otp_tokeninfo == NULL) {
+        return ENOMEM;
+    }
+    /* TODO: Delegate to otp methods to decide on the flags.  */
+    otp_challenge.otp_tokeninfo[0].flags = 0;
 
     /* Encode challenge.  */
     retval = encode_krb5_pa_otp_challenge(&otp_challenge,
                                           &encoded_otp_challenge);
     if (retval != 0) {
         SERVER_DEBUG("Unable to encode challenge.");
+        free(otp_challenge.otp_tokeninfo);
         return retval;
     }
 
@@ -775,8 +782,9 @@ otp_server_verify_padata(krb5_context context,
         goto errout;
     }
     SERVER_DEBUG("Got OTP [%s].", otp);
-    if (otp_req->otp_keyid.data != NULL) {
-        tokenid = strndup(otp_req->otp_keyid.data, otp_req->otp_keyid.length);
+    if (otp_req->otp_token_id.data != NULL) {
+        tokenid = strndup(otp_req->otp_token_id.data,
+                          otp_req->otp_token_id.length);
         if (tokenid == NULL) {
             retval = ENOMEM;
             goto errout;

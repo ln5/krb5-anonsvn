@@ -1752,7 +1752,40 @@ asn1_decode_typed_data_ptr(asn1buf *buf, krb5_typed_data **valptr)
     decode_ptr(krb5_typed_data *, asn1_decode_typed_data);
 }
 
-/* Definitions for http://tools.ietf.org/html/draft-ietf-krb-wg-otp-preauth-14 */
+/* Definitions for draft-ietf-krb-wg-otp-preauth-18.  */
+
+asn1_error_code
+asn1_decode_otp_tokeninfo(asn1buf *buf, krb5_otp_tokeninfo *val)
+{
+    setup();
+    val->flags = 0;
+    val->otp_vendor.data = NULL;
+    val->otp_challenge.data = NULL;
+    val->otp_length = 0;
+    val->otp_token_id.data = NULL;
+    val->otp_alg_id.data = NULL;
+    val->iteration_count = 0;
+    { begin_structure();
+        get_field(val->flags,0,asn1_decode_int32); /* FIXME: OTPFlags */
+        opt_lenfield(val->otp_vendor.length,val->otp_vendor.data,1,asn1_decode_generalstring); /* FIXME: UTF8String */
+        opt_lenfield(val->otp_challenge.length,val->otp_challenge.data,2,asn1_decode_octetstring); /* FIXME: OCTET STRING (SIZE(1..MAX)) */
+        get_field(val->otp_length,3,asn1_decode_int32);
+        opt_lenfield(val->otp_token_id.length,val->otp_token_id.data,4,asn1_decode_octetstring);
+        opt_lenfield(val->otp_alg_id.length,val->otp_alg_id.data,5,asn1_decode_charstring); /* FIXME: AnyURI */
+        /* TODO: supportedHashAlg [6] SEQUENCE OF AlgorithmIdentifier OPTIONAL
+           asn1_decode_sequence_of_algorithm_identifier() */
+        get_field(val->iteration_count,7,asn1_decode_int32);
+        end_structure();
+    }
+
+    return 0;
+ error_out:
+    krb5_free_data_contents(NULL, &val->otp_vendor);
+    free(val->otp_challenge.data); val->otp_challenge.data = 0;
+    free(val->otp_token_id.data); val->otp_token_id.data = 0;
+    krb5_free_data_contents(NULL, &val->otp_alg_id);
+    return retval;
+}
 
 asn1_error_code
 asn1_decode_pa_otp_challenge(asn1buf *buf, krb5_pa_otp_challenge *val)
@@ -1760,16 +1793,16 @@ asn1_decode_pa_otp_challenge(asn1buf *buf, krb5_pa_otp_challenge *val)
     setup();
     val->nonce.data = NULL;
     val->otp_service.data = NULL;
-    val->otp_keyinfo.flags = -1;
+    val->otp_tokeninfo = NULL;
     val->salt.data = NULL;
     val->s2kparams.data = NULL;
     { begin_structure();
         get_lenfield(val->nonce.length,val->nonce.data,0,asn1_decode_charstring);
         opt_lenfield(val->otp_service.length,val->otp_service.data,1,asn1_decode_octetstring);
-        /* TODO: otp_keyinfo */
+        /* TODO: otp_tokeninfo: otp-tokenInfo [2] SEQUENCE (SIZE(1..MAX)) OF OTP-TOKENINFO
+           asn1_decode_otp_tokeninfo() */
         opt_lenfield(val->salt.length,val->salt.data,3,asn1_decode_generalstring);
         opt_lenfield(val->s2kparams.length,val->s2kparams.data,4,asn1_decode_octetstring);
-
         end_structure();
     }
     return 0;
@@ -1778,7 +1811,7 @@ error_out:
     val->nonce.data = NULL;
     krb5_free_data_contents(NULL, &val->otp_service);
     val->otp_service.data = NULL;
-    val->otp_keyinfo.flags = -1;
+    /* TODO: free val->otp_tokeninfo */
     krb5_free_data_contents(NULL, &val->salt);
     val->salt.data = NULL;
     krb5_free_data_contents(NULL, &val->s2kparams);
@@ -1809,28 +1842,30 @@ asn1_decode_pa_otp_req(asn1buf *buf, krb5_pa_otp_req *val)
     val->hash_alg.parameters.data = NULL;
     val->iteration_count = 0;
     val->otp_value.data = NULL;
+    val->otp_pin.data = NULL;
     val->otp_challenge.data = NULL;
+    val->otp_time = 0;
     val->otp_counter.data = NULL;
     val->otp_format = 0;
-    val->otp_time = 0;
-    val->otp_keyid.data = NULL;
-    val->otp_algid.data = NULL;
+    val->otp_token_id.data = NULL;
+    val->otp_alg_id.data = NULL;
     val->otp_vendor.data = NULL;
     { begin_structure();
         get_field(val->flags,0,asn1_decode_krb5_flags);
         opt_lenfield(val->nonce.length,val->nonce.data,1,asn1_decode_charstring);
         opt_encfield(val->enc_data,2,asn1_decode_encrypted_data);
-        /* TODO: hash algorithms */
+        /* TODO: hash_alg: hashAlg [3] AlgorithmIdentifier OPTIONAL */
         opt_field(val->iteration_count,4,asn1_decode_int32,0);
         opt_lenfield(val->otp_value.length,val->otp_value.data,5,asn1_decode_charstring);
-        opt_lenfield(val->otp_challenge.length,val->otp_challenge.data,6,asn1_decode_charstring);
-        opt_lenfield(val->otp_counter.length,val->otp_counter.data,7,asn1_decode_charstring);
-        opt_field(val->otp_format,8,asn1_decode_int32,0);
 
-        opt_lenfield(val->otp_keyid.length,val->otp_keyid.data,10,asn1_decode_charstring);
-        opt_lenfield(val->otp_algid.length,val->otp_algid.data,11,asn1_decode_charstring);
-        opt_lenfield(val->otp_vendor.length,val->otp_vendor.data,12,asn1_decode_charstring);
-
+        opt_lenfield(val->otp_pin.length,val->otp_pin.data,6,asn1_decode_charstring);
+        opt_lenfield(val->otp_challenge.length,val->otp_challenge.data,7,asn1_decode_charstring);
+        opt_field(val->otp_time,8,asn1_decode_kerberos_time,0);
+        opt_lenfield(val->otp_counter.length,val->otp_counter.data,9,asn1_decode_charstring);
+        opt_field(val->otp_format,10,asn1_decode_int32,0); /* FIXME: Correct type is OTPFormat.  */
+        opt_lenfield(val->otp_token_id.length,val->otp_token_id.data,11,asn1_decode_charstring);
+        opt_lenfield(val->otp_alg_id.length,val->otp_alg_id.data,12,asn1_decode_charstring);
+        opt_lenfield(val->otp_vendor.length,val->otp_vendor.data,13,asn1_decode_charstring);
         end_structure();
     }
     return 0;
@@ -1840,3 +1875,4 @@ error_out:
     /* FIXME: add more frees */
     return retval;
 }
+
