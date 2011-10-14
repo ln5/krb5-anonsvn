@@ -1819,18 +1819,6 @@ error_out:
     return retval;
 }
 
-/* TODO: also used in asn1_k_decode_sam.c, maybe put it in a header file */
-#define opt_encfield(fld,tag,fn)                \
-    if (tagnum == tag) {                        \
-        get_field(fld,tag,fn); }                \
-    else {                                      \
-        fld.magic = 0;                          \
-        fld.enctype = 0;                        \
-        fld.kvno = 0;                           \
-        fld.ciphertext.data = NULL;             \
-        fld.ciphertext.length = 0;              \
-    }
-
 asn1_error_code
 asn1_decode_pa_otp_req(asn1buf *buf, krb5_pa_otp_req *val)
 {
@@ -1853,7 +1841,7 @@ asn1_decode_pa_otp_req(asn1buf *buf, krb5_pa_otp_req *val)
     { begin_structure();
         get_field(val->flags,0,asn1_decode_krb5_flags);
         opt_lenfield(val->nonce.length,val->nonce.data,1,asn1_decode_charstring);
-        opt_encfield(val->enc_data,2,asn1_decode_encrypted_data);
+        get_field(val->enc_data,2,asn1_decode_encrypted_data);
         /* TODO: hash_alg: hashAlg [3] AlgorithmIdentifier OPTIONAL */
         opt_field(val->iteration_count,4,asn1_decode_int32,0);
         opt_lenfield(val->otp_value.length,val->otp_value.data,5,asn1_decode_charstring);
