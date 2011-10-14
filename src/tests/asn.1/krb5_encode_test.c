@@ -787,6 +787,14 @@ main(argc, argv)
                    encode_krb5_iakerb_finished);
         ktest_empty_iakerb_finished(&ih);
     }
+    /****************************************************************/
+    /* encode_krb5_pa_otp_req */
+    {
+        krb5_pa_otp_req otp;
+        setup(otp,krb5_pa_otp_req,"pa_otp_req",ktest_make_sample_pa_otp_req);
+        encode_run(otp,krb5_pa_otp_req,"pa_otp_req","",encode_krb5_pa_otp_req);
+        ktest_empty_pa_otp_req(&otp);
+    }
 #ifdef ENABLE_LDAP
     {
         ldap_seqof_key_data skd;
@@ -798,14 +806,6 @@ main(argc, argv)
         ktest_empty_ldap_seqof_key_data(test_context, &skd);
     }
 #endif
-    /****************************************************************/
-    /* encode_krb5_pa_otp_req */
-    {
-        krb5_pa_otp_req otp;
-        setup(otp,krb5_pa_otp_req,"pa_otp_req",ktest_make_sample_pa_otp_req);
-        encode_run(otp,krb5_pa_otp_req,"pa_otp_req","",encode_krb5_pa_otp_req);
-        ktest_empty_pa_otp_req(&otp);
-    }
 
     krb5_free_context(test_context);
     exit(error_count);
