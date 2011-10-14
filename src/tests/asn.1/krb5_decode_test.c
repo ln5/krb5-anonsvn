@@ -972,7 +972,7 @@ int main(argc, argv)
     /* decode_pa_otp_req */
     {
         setup(krb5_pa_otp_req,"krb5_pa_otp_req",ktest_make_sample_pa_otp_req);
-        decode_run("pa_otp_req","","30 15 A0 07 03 05 00 00 00 00 00 A5 0A 04 08 6B 72 62 35 64 61 74 61",decode_krb5_pa_otp_req,ktest_equal_pa_otp_req,ktest_empty_pa_otp_req_with_ctx);
+        decode_run("pa_otp_req","","30 3C A0 07 03 05 00 00 00 00 00 A2 25 30 23 A0 03 02 01 00 A1 03 02 01 05 A2 17 04 15 6B 72 62 41 53 4E 2E 31 20 74 65 73 74 20 6D 65 73 73 61 67 65 A5 0A 04 08 6B 72 62 35 64 61 74 61",decode_krb5_pa_otp_req,ktest_equal_pa_otp_req,ktest_empty_pa_otp_req_with_ctx);
         ktest_empty_pa_otp_req(&ref);
     }
 

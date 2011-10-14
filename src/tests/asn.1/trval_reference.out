@@ -1349,5 +1349,9 @@ encode_krb5_pa_otp_req:
 
 [Sequence/Sequence Of] 
 .  [0] [Bit String] 0x0
+.  [2] [Sequence/Sequence Of] 
+.  .  [0] [Integer] 0
+.  .  [1] [Integer] 5
+.  .  [2] [Octet String] "krbASN.1 test message"
 .  [5] [Octet String] "krb5data"
 

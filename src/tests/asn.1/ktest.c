@@ -981,6 +981,8 @@ krb5_error_code ktest_make_sample_pa_otp_req(p)
     p->flags = 0;
     retval = ktest_make_sample_data(&p->otp_value);
     if (retval) return retval;
+    retval = ktest_make_sample_enc_data(&p->enc_data);
+    if (retval) return retval;
     return retval;
 }
 
