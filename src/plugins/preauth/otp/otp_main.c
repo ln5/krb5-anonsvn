@@ -376,8 +376,7 @@ static int
 otp_server_pick_token(struct otp_server_ctx *ctx,
                       krb5_kdcpreauth_rock rock,
                       const char *token_id_hint,
-                      krb5_kdb_get_string get_string,
-                      krb5_kdb_free_string free_string,
+                      krb5_kdcpreauth_callbacks pa_cb,
                       char **token_id_out,
                       struct otp_method **method_out,
                       char **blob_out)
@@ -404,9 +403,9 @@ otp_server_pick_token(struct otp_server_ctx *ctx,
     /* TODO: Support more than 9 OTP tokens per principal.  */
     token_id = method_name = blob = NULL;
     for (f = 0; f < 10; f++, key[9]--) {
-        free_string(ctx->krb5_context, rock, val);
+        pa_cb->free_string(ctx->krb5_context, rock, val);
 
-        retval = get_string(ctx->krb5_context, rock, key, &val);
+        retval = pa_cb->get_string(ctx->krb5_context, rock, key, &val);
         if (retval != 0)
             goto out;
 
@@ -452,7 +451,7 @@ otp_server_pick_token(struct otp_server_ctx *ctx,
 
  out:
     free(key);
-    free_string(ctx->krb5_context, rock, val);
+    pa_cb->free_string(ctx->krb5_context, rock, val);
     return retval;
 }
 
@@ -482,8 +481,7 @@ static int
 otp_server_create_req_ctx(struct otp_server_ctx *ctx,
                           krb5_kdcpreauth_rock rock,
                           const char *token_id_hint,
-                          krb5_kdb_get_string get_string,
-                          krb5_kdb_free_string free_string,
+                          krb5_kdcpreauth_callbacks pa_cb,
                           struct otp_req_ctx **req_out)
 {
     krb5_error_code retval = 0;
@@ -494,8 +492,7 @@ otp_server_create_req_ctx(struct otp_server_ctx *ctx,
     if (req == NULL)
         return ENOMEM;
 
-    retval = otp_server_pick_token(ctx, rock, token_id_hint,
-                                   get_string, free_string,
+    retval = otp_server_pick_token(ctx, rock, token_id_hint, pa_cb,
                                    &req->token_id, &req->method, &req->blob);
     if (retval != 0) {
         SERVER_DEBUG("Error getting OTP info for principal: %d.", retval);
@@ -793,8 +790,7 @@ otp_server_verify_padata(krb5_context context,
     }
 
     /* Create request context.  */
-    retval = otp_server_create_req_ctx(otp_ctx, rock, tokenid, cb->get_string,
-                                       cb->free_string, &req_ctx);
+    retval = otp_server_create_req_ctx(otp_ctx, rock, tokenid, cb, &req_ctx);
     free(tokenid);
     tokenid = NULL;
     if (retval != 0) {
