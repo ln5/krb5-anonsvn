@@ -206,18 +206,13 @@ otp_client_process(krb5_context context,
                    krb5_kdc_req *request,
                    krb5_data *encoded_request_body,
                    krb5_data *encoded_previous_request,
-                   krb5_pa_data *padata,
+                   krb5_pa_data *pa_data,
                    krb5_prompter_fct prompter,
                    void *prompter_data,
-                   krb5_clpreauth_get_as_key_fn gak_fct,
-                   void *gak_data,
-                   krb5_data *salt,
-                   krb5_data *s2kparams,
-                   krb5_keyblock *as_key,
-                   krb5_pa_data ***out_padata)
+                   krb5_pa_data ***pa_data_out)
 {
     krb5_error_code retval = 0;
-    krb5_keyblock *armor_key = NULL;
+    krb5_keyblock *as_key = NULL;
     krb5_pa_data *pa = NULL;
     krb5_pa_data **pa_array = NULL;
     struct otp_client_ctx *otp_ctx = (struct otp_client_ctx *) moddata;
@@ -227,26 +222,26 @@ otp_client_process(krb5_context context,
     krb5_data encoded_otp_challenge;
     size_t size;
 
-    armor_key = cb->fast_armor(context, rock);
-    if (armor_key == NULL) {
+    /* Use FAST armor key as response key.  */
+    as_key = cb->fast_armor(context, rock);
+    if (as_key == NULL) {
         CLIENT_DEBUG("Missing armor key.\n");
         goto errout;
     }
 
-    krb5_free_keyblock_contents(context, as_key);
-    retval = krb5_copy_keyblock_contents(context, armor_key, as_key);
+    retval = cb->set_as_key(context, rock, as_key);
     if (retval != 0) {
-        CLIENT_DEBUG("krb5_copy_keyblock_contents failed.\n");
+        CLIENT_DEBUG("Unable to set reply key.\n");
         goto errout;
     }
 
-    CLIENT_DEBUG("Got [%d] bytes padata type [%d].\n", padata->length,
-                 padata->pa_type);
+    CLIENT_DEBUG("Got [%d] bytes pa-data type [%d].\n", pa_data->length,
+                 pa_data->pa_type);
 
-    if (padata->pa_type == KRB5_PADATA_OTP_CHALLENGE) {
-        if (padata->length != 0) {
-            encoded_otp_challenge.data = (char *) padata->contents;
-            encoded_otp_challenge.length = padata->length;
+    if (pa_data->pa_type == KRB5_PADATA_OTP_CHALLENGE) {
+        if (pa_data->length != 0) {
+            encoded_otp_challenge.data = (char *) pa_data->contents;
+            encoded_otp_challenge.length = pa_data->length;
             retval = decode_krb5_pa_otp_challenge(&encoded_otp_challenge,
                                                   &otp_challenge);
             if (retval != 0) {
@@ -320,7 +315,7 @@ otp_client_process(krb5_context context,
 
         pa_array[0] = pa;
         pa = NULL;
-        *out_padata = pa_array;
+        *pa_data_out = pa_array;
         pa_array = NULL;
     } else {
         CLIENT_DEBUG("Unexpected PA data.\n");
@@ -608,16 +603,19 @@ otp_server_fini(krb5_context context, krb5_kdcpreauth_moddata moddata)
     free(ctx);
 }
 
-static krb5_error_code
+static void
 otp_server_get_edata(krb5_context context,
                      krb5_kdc_req *request,
                      krb5_kdcpreauth_callbacks cb,
                      krb5_kdcpreauth_rock rock,
                      krb5_kdcpreauth_moddata moddata,
-                     krb5_pa_data *pa_data_out)
+                     krb5_preauthtype pa_type,
+                     krb5_kdcpreauth_edata_respond_fn respond,
+                     void *arg)
 {
     krb5_error_code retval = -1;
     krb5_keyblock *armor_key = NULL;
+    krb5_pa_data *pa = NULL;
     krb5_pa_otp_challenge otp_challenge;
     krb5_data *encoded_otp_challenge = NULL;
     struct otp_server_ctx *otp_ctx = (struct otp_server_ctx *) moddata;
@@ -630,7 +628,14 @@ otp_server_get_edata(krb5_context context,
     armor_key = cb->fast_armor(context, rock);
     if (armor_key == NULL) {
         SERVER_DEBUG("No armor key found.");
-        return EINVAL;
+        (*respond)(arg,  EINVAL, NULL);
+        return;
+    }
+
+    pa = calloc(1, sizeof(krb5_pa_data));
+    if (pa == NULL) {
+        (*respond)(arg, ENOMEM, NULL);
+        return;
     }
 
     /* Create nonce from random data + timestamp.  Length of random
@@ -640,16 +645,19 @@ otp_server_get_edata(krb5_context context,
     otp_challenge.nonce.length = armor_key->length + 8;
     otp_challenge.nonce.data = (char *) malloc(otp_challenge.nonce.length);
     if (otp_challenge.nonce.data == NULL) {
-        return ENOMEM;
+        (*respond)(arg, ENOMEM, NULL);
+        return;
     }
     retval = krb5_c_random_make_octets(context, &otp_challenge.nonce);
     if (retval != 0) {
         SERVER_DEBUG("Unable to create random data for nonce.");
-        return retval;
+        (*respond)(arg, retval, NULL);
+        return;
     }
     if (krb5_us_timeofday(context, &now_sec, &now_usec) != 0) {
         SERVER_DEBUG("Unable to get current time.");
-        return KRB5KDC_ERR_PREAUTH_FAILED;
+        (*respond)(arg, KRB5KDC_ERR_PREAUTH_FAILED, NULL);
+        return;
     }
     *((uint32_t *) (otp_challenge.nonce.data + armor_key->length)) =
         htonl(now_sec);
@@ -660,7 +668,8 @@ otp_server_get_edata(krb5_context context,
     otp_challenge.otp_tokeninfo = calloc(otp_challenge.n_otp_tokeninfo,
                                          sizeof(krb5_otp_tokeninfo));
     if (otp_challenge.otp_tokeninfo == NULL) {
-        return ENOMEM;
+        (*respond)(arg,  ENOMEM, NULL);
+        return;
     }
     /* TODO: Delegate to otp methods to decide on the flags.  */
     otp_challenge.otp_tokeninfo[0].flags = 0;
@@ -671,13 +680,15 @@ otp_server_get_edata(krb5_context context,
     if (retval != 0) {
         SERVER_DEBUG("Unable to encode challenge.");
         free(otp_challenge.otp_tokeninfo);
-        return retval;
+        (*respond)(arg, retval, NULL);
+        return;
     }
 
-    pa_data_out->pa_type = KRB5_PADATA_OTP_CHALLENGE;
-    pa_data_out->contents = (krb5_octet *) encoded_otp_challenge->data;
-    pa_data_out->length = encoded_otp_challenge->length;
-    return 0;
+    pa->pa_type = KRB5_PADATA_OTP_CHALLENGE;
+    pa->contents = (krb5_octet *) encoded_otp_challenge->data;
+    pa->length = encoded_otp_challenge->length;
+
+    (*respond)(arg, retval, pa);
 }
 
 static void
