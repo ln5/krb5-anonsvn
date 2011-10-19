@@ -444,7 +444,6 @@ krb5_make_authdata_kdc_issued
 krb5_make_full_ipaddr
 krb5_make_fulladdr
 krb5_max_dgram_size
-krb5_max_skdc_timeout
 krb5_mcc_ops
 krb5_merge_authdata
 krb5_mk_1cred
@@ -469,6 +468,7 @@ krb5_pac_get_buffer
 krb5_pac_get_types
 krb5_pac_init
 krb5_pac_parse
+krb5_pac_sign
 krb5_pac_verify
 krb5_parse_name
 krb5_parse_name_flags
@@ -573,8 +573,6 @@ krb5_set_principal_realm
 krb5_set_real_time
 krb5_set_time_offsets
 krb5_size_opaque
-krb5_skdc_timeout_1
-krb5_skdc_timeout_shift
 krb5_sname_match
 krb5_sname_to_principal
 krb5_string_to_deltat
@@ -621,7 +619,6 @@ krb5int_get_authdata_containee_types
 krb5int_init_context_kdc
 krb5int_init_trace
 krb5int_initialize_library
-krb5int_pac_sign
 krb5int_sendtokdc_debug_handler
 krb5int_trace
 profile_abandon

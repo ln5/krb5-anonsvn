@@ -43,8 +43,8 @@ k5_insert_client_info(krb5_context context,
     krb5_ui_8 nt_authtime;
 
     /* If we already have a CLIENT_INFO buffer, then just validate it */
-    if (k5_pac_locate_buffer(context, pac,
-                             PAC_CLIENT_INFO, &client_info) == 0) {
+    if (k5_pac_locate_buffer(context, pac, KRB5_PAC_CLIENT_INFO,
+                             &client_info) == 0) {
         return k5_pac_validate_client(context, pac, authtime, principal);
     }
 
@@ -63,7 +63,7 @@ k5_insert_client_info(krb5_context context,
     client_info.length = PAC_CLIENT_INFO_LENGTH + princ_name_ucs2_len;
     client_info.data = NULL;
 
-    ret = k5_pac_add_buffer(context, pac, PAC_CLIENT_INFO,
+    ret = k5_pac_add_buffer(context, pac, KRB5_PAC_CLIENT_INFO,
                             &client_info, TRUE, &client_info);
     if (ret != 0)
         goto cleanup;
@@ -180,13 +180,9 @@ k5_pac_encode_header(krb5_context context, krb5_pac pac)
 }
 
 krb5_error_code KRB5_CALLCONV
-krb5int_pac_sign(krb5_context context,
-                 krb5_pac pac,
-                 krb5_timestamp authtime,
-                 krb5_const_principal principal,
-                 const krb5_keyblock *server_key,
-                 const krb5_keyblock *privsvr_key,
-                 krb5_data *data)
+krb5_pac_sign(krb5_context context, krb5_pac pac, krb5_timestamp authtime,
+              krb5_const_principal principal, const krb5_keyblock *server_key,
+              const krb5_keyblock *privsvr_key, krb5_data *data)
 {
     krb5_error_code ret;
     krb5_data server_cksum, privsvr_cksum;
@@ -203,12 +199,12 @@ krb5int_pac_sign(krb5_context context,
     }
 
     /* Create zeroed buffers for both checksums */
-    ret = k5_insert_checksum(context, pac, PAC_SERVER_CHECKSUM,
+    ret = k5_insert_checksum(context, pac, KRB5_PAC_SERVER_CHECKSUM,
                              server_key, &server_cksumtype);
     if (ret != 0)
         return ret;
 
-    ret = k5_insert_checksum(context, pac, PAC_PRIVSVR_CHECKSUM,
+    ret = k5_insert_checksum(context, pac, KRB5_PAC_PRIVSVR_CHECKSUM,
                              privsvr_key, &privsvr_cksumtype);
     if (ret != 0)
         return ret;
@@ -219,8 +215,8 @@ krb5int_pac_sign(krb5_context context,
         return ret;
 
     /* Generate the server checksum over the entire PAC */
-    ret = k5_pac_locate_buffer(context, pac,
-                               PAC_SERVER_CHECKSUM, &server_cksum);
+    ret = k5_pac_locate_buffer(context, pac, KRB5_PAC_SERVER_CHECKSUM,
+                               &server_cksum);
     if (ret != 0)
         return ret;
 
@@ -240,8 +236,8 @@ krb5int_pac_sign(krb5_context context,
         return ret;
 
     /* Generate the privsvr checksum over the server checksum buffer */
-    ret = k5_pac_locate_buffer(context, pac,
-                               PAC_PRIVSVR_CHECKSUM, &privsvr_cksum);
+    ret = k5_pac_locate_buffer(context, pac, KRB5_PAC_PRIVSVR_CHECKSUM,
+                               &privsvr_cksum);
     if (ret != 0)
         return ret;
 

@@ -37,6 +37,8 @@
 
 #include <errno.h>
 
+#include <afxwin.h>
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE
@@ -52,7 +54,10 @@ HANDLE m_tgsReqMutex = 0;
 
 HWND CLeashApp::m_hProgram = 0;
 HINSTANCE CLeashApp::m_hLeashDLL = 0;
+////@#+Remove
+#ifndef NO_KRB4
 HINSTANCE CLeashApp::m_hKrb4DLL = 0;
+#endif
 HINSTANCE CLeashApp::m_hKrb5DLL = 0;
 HINSTANCE CLeashApp::m_hKrb5ProfileDLL= 0;
 HINSTANCE CLeashApp::m_hAfsDLL = 0;
@@ -118,7 +123,9 @@ CLeashApp::~CLeashApp()
 #endif
 #endif
 	AfxFreeLibrary(m_hLeashDLL);
+#ifndef NO_KRB4
 	AfxFreeLibrary(m_hKrb4DLL);
+#endif
 	AfxFreeLibrary(m_hKrb5DLL);
 	AfxFreeLibrary(m_hKrb5ProfileDLL);
 	AfxFreeLibrary(m_hAfsDLL);
@@ -191,9 +198,9 @@ BOOL CLeashApp::InitInstance()
                 0 == stricmp(optionParam+1, "i"))
             {
                 LSH_DLGINFO_EX ldi;
-				char username[64]="";
-				char realm[192]="";
-				int i=0, j=0;
+		char username[64]="";
+		char realm[192]="";
+		int i=0, j=0;
                 TicketList* ticketList = NULL;
                 if (WaitForSingleObject( ticketinfo.lockObj, INFINITE ) != WAIT_OBJECT_0)
                     throw("Unable to lock ticketinfo");
@@ -578,6 +585,8 @@ FUNC_INFO leash_fi[] = {
     END_FUNC_INFO
 };
 
+////
+#ifndef NO_KRB4
 // krb4 functions
 DECL_FUNC_PTR(set_krb_debug);
 DECL_FUNC_PTR(set_krb_ap_req_debug);
@@ -607,6 +616,7 @@ FUNC_INFO krb4_fi[] = {
     MAKE_FUNC_INFO(krb_get_tf_realm),
     END_FUNC_INFO
 };
+#endif
 
 
 // psapi functions
@@ -716,7 +726,9 @@ FUNC_INFO profile_fi[] = {
 BOOL CLeashApp::InitDLLs()
 {
     m_hLeashDLL = AfxLoadLibrary(LEASHDLL);
+#ifndef NO_KRB4
     m_hKrb4DLL = AfxLoadLibrary(KERB4DLL);
+#endif
     m_hKrb5DLL = AfxLoadLibrary(KERB5DLL);
     m_hKrb5ProfileDLL = AfxLoadLibrary(KERB5_PPROFILE_DLL);
 
@@ -748,6 +760,8 @@ BOOL CLeashApp::InitDLLs()
         return FALSE;
     }
 
+////
+#ifndef NO_KRB4
     if (m_hKrb4DLL)
     {
         if (!LoadFuncs(KERB4DLL, krb4_fi, 0, 0, 1, 0, 0))
@@ -758,6 +772,7 @@ BOOL CLeashApp::InitDLLs()
                        "Error", MB_OK);
         }
     }
+#endif
 
     if (m_hKrb5DLL)
     {
@@ -947,7 +962,7 @@ CLeashApp::ValidateConfigFiles()
                 }
 
                 char realmkey[256]="SYSTEM\\CurrentControlSet\\Control\\Lsa\\Kerberos\\Domains\\";
-                int  keylen = strlen(realmkey)-1;
+                size_t  keylen = strlen(realmkey)-1;
 
                 if ( domain[0] ) {
                     strncpy(realm,domain,256);
@@ -1119,6 +1134,8 @@ CLeashApp::ValidateConfigFiles()
             }
 
         }
+////
+#ifndef NO_KRB4
     } else if ( m_hKrb4DLL ) {
         if ( !realm[0] ) {
             /* Open ticket file */
@@ -1162,16 +1179,23 @@ CLeashApp::ValidateConfigFiles()
             } else
 				krbCon.Close();
         }
+#endif
     }
 }
 
+////@#+Should this be just deleted or reworked?
 BOOL
 CLeashApp::GetKrb4ConFile(
     LPSTR confname,
     UINT szConfname
     )
 {
-    if (m_hKrb5DLL && !m_hKrb4DLL)
+    if (m_hKrb5DLL
+////
+#ifndef NO_KRB4
+	&& !m_hKrb4DLL
+#endif
+	)
 	{ // hold krb.con where krb5.ini is located
 		CHAR krbConFile[MAX_PATH]="";
 	    //strcpy(krbConFile, CLeashApp::m_krbv5_profile->first_file->filename);
@@ -1198,6 +1222,8 @@ CLeashApp::GetKrb4ConFile(
 		strncpy(confname, krbConFile, szConfname);
         confname[szConfname-1] = '\0';
 	}
+////
+#ifndef NO_KRB4
 	else if (m_hKrb4DLL)
 	{
         unsigned int size = szConfname;
@@ -1212,6 +1238,8 @@ CLeashApp::GetKrb4ConFile(
             confname[szConfname-1] = '\0';
 		}
 	}
+#endif
+
     return FALSE;
 }
 
@@ -1221,7 +1249,12 @@ CLeashApp::GetKrb4RealmFile(
     UINT szConfname
     )
 {
-    if (m_hKrb5DLL && !m_hKrb4DLL)
+    if (m_hKrb5DLL
+////
+#ifndef NO_KRB4
+	&& !m_hKrb4DLL
+#endif
+	)
 	{ // hold krb.con where krb5.ini is located
 		CHAR krbRealmConFile[MAX_PATH];
 		//strcpy(krbRealmConFile, CLeashApp::m_krbv5_profile->first_file->filename);
@@ -1248,6 +1281,8 @@ CLeashApp::GetKrb4RealmFile(
 		strncpy(confname, krbRealmConFile, szConfname);
         confname[szConfname-1] = '\0';
 	}
+////
+#ifndef NO_KRB4
 	else if (m_hKrb4DLL)
 	{
         unsigned int size = szConfname;
@@ -1263,6 +1298,8 @@ CLeashApp::GetKrb4RealmFile(
             return TRUE;
 		}
 	}
+#endif
+
     return FALSE;
 }
 

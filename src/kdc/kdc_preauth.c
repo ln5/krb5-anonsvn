@@ -105,26 +105,16 @@ typedef struct preauth_system_st {
 } preauth_system;
 
 static void
-verify_enc_timestamp(krb5_context, krb5_data *req_pkt, krb5_kdc_req *request,
-                     krb5_enc_tkt_part *enc_tkt_reply, krb5_pa_data *data,
-                     krb5_kdcpreauth_callbacks cb, krb5_kdcpreauth_rock rock,
-                     krb5_kdcpreauth_moddata moddata,
-                     krb5_kdcpreauth_verify_respond_fn respond, void *arg);
-
-static krb5_error_code
-get_enc_ts(krb5_context context, krb5_kdc_req *request,
-           krb5_kdcpreauth_callbacks cb, krb5_kdcpreauth_rock rock,
-           krb5_kdcpreauth_moddata modata, krb5_pa_data *data);
-
-static krb5_error_code
 get_etype_info(krb5_context context, krb5_kdc_req *request,
                krb5_kdcpreauth_callbacks cb, krb5_kdcpreauth_rock rock,
-               krb5_kdcpreauth_moddata moddata, krb5_pa_data *data);
+               krb5_kdcpreauth_moddata moddata, krb5_preauthtype pa_type,
+               krb5_kdcpreauth_edata_respond_fn respond, void *arg);
 
-static krb5_error_code
+static void
 get_etype_info2(krb5_context context, krb5_kdc_req *request,
                 krb5_kdcpreauth_callbacks cb, krb5_kdcpreauth_rock rock,
-                krb5_kdcpreauth_moddata moddata, krb5_pa_data *pa_data);
+                krb5_kdcpreauth_moddata moddata, krb5_preauthtype pa_type,
+                krb5_kdcpreauth_edata_respond_fn respond, void *arg);
 
 static krb5_error_code
 etype_info_as_rep_helper(krb5_context context, krb5_pa_data * padata,
@@ -211,17 +201,6 @@ static preauth_system static_preauth_systems[] = {
         NULL                    /* free_modreq */
     },
 #endif /* APPLE_PKINIT */
-    {
-        "timestamp",
-        KRB5_PADATA_ENC_TIMESTAMP,
-        0,
-        NULL,
-        NULL,
-        NULL,
-        get_enc_ts,
-        verify_enc_timestamp,
-        0
-    },
     {
         "FAST",
         KRB5_PADATA_FX_FAST,
@@ -767,64 +746,132 @@ const char *missing_required_preauth(krb5_db_entry *client,
     return 0;
 }
 
-void
-get_preauth_hint_list(krb5_kdc_req *request, krb5_kdcpreauth_rock rock,
-                      krb5_pa_data ***e_data_out)
-{
+struct hint_state {
+    kdc_hint_respond_fn respond;
+    void *arg;
+    kdc_realm_t *realm;
+
+    krb5_kdcpreauth_rock rock;
+    krb5_kdc_req *request;
+    krb5_pa_data ***e_data_out;
+
     int hw_only;
     preauth_system *ap;
-    krb5_pa_data **pa_data, **pa;
-    krb5_error_code retval;
+    krb5_pa_data **pa_data, **pa_cur;
+    krb5_preauthtype pa_type;
+};
+
+static void
+hint_list_finish(struct hint_state *state, krb5_error_code code)
+{
+    kdc_hint_respond_fn oldrespond = state->respond;
+    void *oldarg = state->arg;
+
+    if (!code) {
+        if (state->pa_data[0] == 0) {
+            krb5_klog_syslog(LOG_INFO,
+                             _("%spreauth required but hint list is empty"),
+                             state->hw_only ? "hw" : "");
+        }
+        /* If we fail to get the cookie it is probably still reasonable to
+         * continue with the response. */
+        kdc_preauth_get_cookie(state->rock->rstate, state->pa_cur);
+
+        *state->e_data_out = state->pa_data;
+        state->pa_data = NULL;
+    }
+
+    krb5_free_pa_data(kdc_context, state->pa_data);
+    free(state);
+    (*oldrespond)(oldarg);
+}
+
+static void
+hint_list_next(struct hint_state *arg);
+
+static void
+finish_get_edata(void *arg, krb5_error_code code, krb5_pa_data *pa)
+{
+    struct hint_state *state = arg;
+
+    kdc_active_realm = state->realm;
+    if (code == 0) {
+        if (pa == NULL) {
+            /* Include an empty value of the current type. */
+            pa = calloc(1, sizeof(*pa));
+            pa->magic = KV5M_PA_DATA;
+            pa->pa_type = state->pa_type;
+        }
+        *state->pa_cur++ = pa;
+    }
+
+    state->ap++;
+    hint_list_next(state);
+}
+
+static void
+hint_list_next(struct hint_state *state)
+{
+    preauth_system *ap = state->ap;
+
+    if (ap->type == -1) {
+        hint_list_finish(state, 0);
+        return;
+    }
+
+    if (state->hw_only && !(ap->flags & PA_HARDWARE))
+        goto next;
+    if (ap->flags & PA_PSEUDO)
+        goto next;
+
+    state->pa_type = ap->type;
+    if (ap->get_edata) {
+        ap->get_edata(kdc_context, state->request, &callbacks, state->rock,
+                      ap->moddata, ap->type, finish_get_edata, state);
+    } else
+        finish_get_edata(state, ap->type, NULL);
+    return;
+
+next:
+    state->ap++;
+    hint_list_next(state);
+}
+
+void
+get_preauth_hint_list(krb5_kdc_req *request, krb5_kdcpreauth_rock rock,
+                      krb5_pa_data ***e_data_out, kdc_hint_respond_fn respond,
+                      void *arg)
+{
+    struct hint_state *state;
 
     *e_data_out = NULL;
 
-    hw_only = isflagset(rock->client->attributes, KRB5_KDB_REQUIRES_HW_AUTH);
-    /* Allocate two extra entries for the cookie and the terminator. */
-    pa_data = calloc(n_preauth_systems + 2, sizeof(krb5_pa_data *));
-    if (pa_data == 0)
+    /* Allocate our state. */
+    state = malloc(sizeof(*state));
+    if (!state) {
+        (*respond)(arg);
         return;
-    pa = pa_data;
-
-    for (ap = preauth_systems; ap->type != -1; ap++) {
-        if (hw_only && !(ap->flags & PA_HARDWARE))
-            continue;
-        if (ap->flags & PA_PSEUDO)
-            continue;
-        *pa = malloc(sizeof(krb5_pa_data));
-        if (*pa == 0)
-            goto errout;
-        memset(*pa, 0, sizeof(krb5_pa_data));
-        (*pa)->magic = KV5M_PA_DATA;
-        (*pa)->pa_type = ap->type;
-        if (ap->get_edata) {
-            retval = ap->get_edata(kdc_context, request, &callbacks, rock,
-                                   ap->moddata, *pa);
-            if (retval) {
-                /* just failed on this type, continue */
-                free(*pa);
-                *pa = 0;
-                continue;
-            }
-        }
-        pa++;
     }
-    if (pa_data[0] == 0) {
-        krb5_klog_syslog(LOG_INFO,
-                         _("%spreauth required but hint list is empty"),
-                         hw_only ? "hw" : "");
+    state->hw_only = isflagset(rock->client->attributes,
+                               KRB5_KDB_REQUIRES_HW_AUTH);
+    state->respond = respond;
+    state->arg = arg;
+    state->request = request;
+    state->rock = rock;
+    state->realm = kdc_active_realm;
+    state->e_data_out = e_data_out;
+
+    /* Allocate two extra entries for the cookie and the terminator. */
+    state->pa_data = calloc(n_preauth_systems + 2, sizeof(krb5_pa_data *));
+    if (!state->pa_data) {
+        free(state);
+        (*respond)(arg);
+        return;
     }
-    /*
-     * If we fail to get the cookie it is probably
-     * still reasonable to continue with the response
-     */
-    kdc_preauth_get_cookie(rock->rstate, pa);
 
-    *e_data_out = pa_data;
-    pa_data = NULL;
-
-errout:
-    krb5_free_pa_data(kdc_context, pa_data);
-    return;
+    state->pa_cur = state->pa_data;
+    state->ap = preauth_systems;
+    hint_list_next(state);
 }
 
 /*
@@ -1266,107 +1313,6 @@ request_contains_enctype(krb5_context context,  const krb5_kdc_req *request,
 }
 
 static krb5_error_code
-get_enc_ts(krb5_context context, krb5_kdc_req *request,
-           krb5_kdcpreauth_callbacks cb, krb5_kdcpreauth_rock rock,
-           krb5_kdcpreauth_moddata moddata, krb5_pa_data *data)
-{
-    if (rock->rstate->armor_key != NULL)
-        return ENOENT;
-    return 0;
-}
-
-
-static void
-verify_enc_timestamp(krb5_context context, krb5_data *req_pkt,
-                     krb5_kdc_req *request, krb5_enc_tkt_part *enc_tkt_reply,
-                     krb5_pa_data *pa, krb5_kdcpreauth_callbacks cb,
-                     krb5_kdcpreauth_rock rock,
-                     krb5_kdcpreauth_moddata moddata,
-                     krb5_kdcpreauth_verify_respond_fn respond,
-                     void *arg)
-{
-    krb5_pa_enc_ts *            pa_enc = 0;
-    krb5_error_code             retval;
-    krb5_data                   scratch;
-    krb5_data                   enc_ts_data;
-    krb5_enc_data               *enc_data = 0;
-    krb5_keyblock               key;
-    krb5_key_data *             client_key;
-    krb5_int32                  start;
-    krb5_timestamp              timenow;
-    krb5_error_code             decrypt_err = 0;
-
-    scratch.data = (char *)pa->contents;
-    scratch.length = pa->length;
-
-    enc_ts_data.data = 0;
-
-    if ((retval = decode_krb5_enc_data(&scratch, &enc_data)) != 0)
-        goto cleanup;
-
-    enc_ts_data.length = enc_data->ciphertext.length;
-    if ((enc_ts_data.data = (char *) malloc(enc_ts_data.length)) == NULL)
-        goto cleanup;
-
-    start = 0;
-    decrypt_err = 0;
-    while (1) {
-        if ((retval = krb5_dbe_search_enctype(context, rock->client,
-                                              &start, enc_data->enctype,
-                                              -1, 0, &client_key)))
-            goto cleanup;
-
-        if ((retval = krb5_dbe_decrypt_key_data(context, NULL, client_key,
-                                                &key, NULL)))
-            goto cleanup;
-
-        key.enctype = enc_data->enctype;
-
-        retval = krb5_c_decrypt(context, &key, KRB5_KEYUSAGE_AS_REQ_PA_ENC_TS,
-                                0, enc_data, &enc_ts_data);
-        krb5_free_keyblock_contents(context, &key);
-        if (retval == 0)
-            break;
-        else
-            decrypt_err = retval;
-    }
-
-    if ((retval = decode_krb5_pa_enc_ts(&enc_ts_data, &pa_enc)) != 0)
-        goto cleanup;
-
-    if ((retval = krb5_timeofday(context, &timenow)) != 0)
-        goto cleanup;
-
-    if (labs(timenow - pa_enc->patimestamp) > context->clockskew) {
-        retval = KRB5KRB_AP_ERR_SKEW;
-        goto cleanup;
-    }
-
-    setflag(enc_tkt_reply->flags, TKT_FLG_PRE_AUTH);
-
-    retval = 0;
-
-cleanup:
-    if (enc_data) {
-        krb5_free_data_contents(context, &enc_data->ciphertext);
-        free(enc_data);
-    }
-    krb5_free_data_contents(context, &enc_ts_data);
-    if (pa_enc)
-        free(pa_enc);
-    /*
-     * If we get NO_MATCHING_KEY and decryption previously failed, and
-     * we failed to find any other keys of the correct enctype after
-     * that failed decryption, it probably means that the password was
-     * incorrect.
-     */
-    if (retval == KRB5_KDB_NO_MATCHING_KEY && decrypt_err != 0)
-        retval = decrypt_err;
-
-    (*respond)(arg, retval, NULL, NULL, NULL);
-}
-
-static krb5_error_code
 _make_etype_info_entry(krb5_context context,
                        krb5_principal client_princ, krb5_key_data *client_key,
                        krb5_enctype etype, krb5_etype_info_entry **entry,
@@ -1427,29 +1373,26 @@ fail:
         free(salt.data);
     return retval;
 }
-/*
- * This function returns the etype information for a particular
- * client, to be passed back in the preauth list in the KRB_ERROR
- * message.  It supports generating both etype_info  and etype_info2
- *  as most of the work is the same.
- */
-static krb5_error_code
-etype_info_helper(krb5_context context, krb5_kdc_req *request,
-                  krb5_db_entry *client, krb5_pa_data *pa_data,
-                  int etype_info2)
-{
-    krb5_etype_info_entry **    entry = 0;
-    krb5_key_data               *client_key;
-    krb5_error_code             retval;
-    krb5_data *                 scratch;
-    krb5_enctype                db_etype;
-    int                         i = 0;
-    int                         start = 0;
-    int                         seen_des = 0;
 
-    entry = malloc((client->n_key_data * 2 + 1) * sizeof(krb5_etype_info_entry *));
+/* Create etype information for a client for the preauth-required hint list,
+ * for either etype-info or etype-info2. */
+static void
+etype_info_helper(krb5_context context, krb5_kdc_req *request,
+                  krb5_db_entry *client, krb5_preauthtype pa_type,
+                  krb5_kdcpreauth_edata_respond_fn respond, void *arg)
+{
+    krb5_error_code retval;
+    krb5_pa_data *pa = NULL;
+    krb5_etype_info_entry **entry = NULL;
+    krb5_data *scratch = NULL;
+    krb5_key_data *client_key;
+    krb5_enctype db_etype;
+    int i = 0, start = 0, seen_des = 0;
+    int etype_info2 = (pa_type == KRB5_PADATA_ETYPE_INFO2);
+
+    entry = k5alloc((client->n_key_data * 2 + 1) * sizeof(*entry), &retval);
     if (entry == NULL)
-        return ENOMEM;
+        goto cleanup;
     entry[0] = NULL;
 
     while (1) {
@@ -1470,7 +1413,6 @@ etype_info_helper(krb5_context context, krb5_kdc_req *request,
                                             db_etype, &entry[i], etype_info2);
             if (retval != 0)
                 goto cleanup;
-            entry[i+1] = 0;
             i++;
         }
 
@@ -1508,39 +1450,47 @@ etype_info_helper(krb5_context context, krb5_kdc_req *request,
         retval = encode_krb5_etype_info(entry, &scratch);
     if (retval)
         goto cleanup;
-    pa_data->contents = (unsigned char *)scratch->data;
-    pa_data->length = scratch->length;
-    free(scratch);
-
-    retval = 0;
+    pa = k5alloc(sizeof(*pa), &retval);
+    if (pa == NULL)
+        goto cleanup;
+    pa->magic = KV5M_PA_DATA;
+    pa->pa_type = pa_type;
+    pa->contents = (unsigned char *)scratch->data;
+    pa->length = scratch->length;
+    scratch->data = NULL;
 
 cleanup:
-    if (entry)
-        krb5_free_etype_info(context, entry);
-    return retval;
+    krb5_free_etype_info(context, entry);
+    krb5_free_data(context, scratch);
+    (*respond)(arg, retval, pa);
 }
 
-static krb5_error_code
+static void
 get_etype_info(krb5_context context, krb5_kdc_req *request,
                krb5_kdcpreauth_callbacks cb, krb5_kdcpreauth_rock rock,
-               krb5_kdcpreauth_moddata moddata, krb5_pa_data *pa_data)
+               krb5_kdcpreauth_moddata moddata, krb5_preauthtype pa_type,
+               krb5_kdcpreauth_edata_respond_fn respond, void *arg)
 {
     int i;
+
     for (i=0;  i < request->nktypes; i++) {
-        if (enctype_requires_etype_info_2(request->ktype[i]))
-            return KRB5KDC_ERR_PADATA_TYPE_NOSUPP ;;;; /*Caller will
-                                                        * skip this
-                                                        * type*/
+        if (enctype_requires_etype_info_2(request->ktype[i])) {
+            /* Requestor understands etype-info2, so don't send etype-info. */
+            (*respond)(arg, KRB5KDC_ERR_PADATA_TYPE_NOSUPP, NULL);
+            return;
+        }
     }
-    return etype_info_helper(context, request, rock->client, pa_data, 0);
+
+    etype_info_helper(context, request, rock->client, pa_type, respond, arg);
 }
 
-static krb5_error_code
+static void
 get_etype_info2(krb5_context context, krb5_kdc_req *request,
                 krb5_kdcpreauth_callbacks cb, krb5_kdcpreauth_rock rock,
-                krb5_kdcpreauth_moddata moddata, krb5_pa_data *pa_data)
+                krb5_kdcpreauth_moddata moddata, krb5_preauthtype pa_type,
+                krb5_kdcpreauth_edata_respond_fn respond, void *arg)
 {
-    return etype_info_helper(context, request, rock->client, pa_data, 1);
+    etype_info_helper(context, request, rock->client, pa_type, respond, arg);
 }
 
 static krb5_error_code

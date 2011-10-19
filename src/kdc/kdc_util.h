@@ -166,9 +166,11 @@ const char *
 missing_required_preauth (krb5_db_entry *client,
                           krb5_db_entry *server,
                           krb5_enc_tkt_part *enc_tkt_reply);
+typedef void (*kdc_hint_respond_fn)(void *arg);
 void
 get_preauth_hint_list(krb5_kdc_req *request, krb5_kdcpreauth_rock rock,
-                      krb5_pa_data ***e_data_out);
+                      krb5_pa_data ***e_data_out, kdc_hint_respond_fn respond,
+                      void *arg);
 void
 load_preauth_plugins(krb5_context context);
 void
@@ -234,6 +236,7 @@ handle_authdata (krb5_context context,
 /* replay.c */
 krb5_boolean kdc_check_lookaside (krb5_data *, krb5_data **);
 void kdc_insert_lookaside (krb5_data *, krb5_data *);
+void kdc_remove_lookaside (krb5_context kcontext, krb5_data *);
 void kdc_free_lookaside(krb5_context);
 
 /* kdc_util.c */

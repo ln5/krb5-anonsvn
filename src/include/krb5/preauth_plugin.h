@@ -143,24 +143,6 @@ typedef struct krb5_clpreauth_rock_st *krb5_clpreauth_rock;
 typedef struct krb5_clpreauth_moddata_st *krb5_clpreauth_moddata;
 typedef struct krb5_clpreauth_modreq_st *krb5_clpreauth_modreq;
 
-/*
- * Provided by krb5: a callback which will obtain the user's long-term AS key
- * by prompting the user for the password, then salting it properly, and so on.
- * For the moment, it's identical to the get_as_key callback used inside of
- * libkrb5, but we define a new typedef here instead of making the existing one
- * public to isolate ourselves from potential future changes.
- */
-typedef krb5_error_code
-(*krb5_clpreauth_get_as_key_fn)(krb5_context context,
-                                krb5_principal princ,
-                                krb5_enctype enctype,
-                                krb5_prompter_fct prompter,
-                                void *prompter_data,
-                                krb5_data *salt,
-                                krb5_data *s2kparams,
-                                krb5_keyblock *as_key,
-                                void *gak_data);
-
 /* Before using a callback after version 1, modules must check the vers
  * field of the callback structure. */
 typedef struct krb5_clpreauth_callbacks_st {
@@ -178,6 +160,20 @@ typedef struct krb5_clpreauth_callbacks_st {
      * FAST.  The returned pointer is an alias and should not be freed. */
     krb5_keyblock *(*fast_armor)(krb5_context context,
                                  krb5_clpreauth_rock rock);
+
+    /*
+     * Get a pointer to the client-supplied reply key, possibly invoking the
+     * prompter to ask for a password if this has not already been done.  The
+     * returned pointer is an alias and should not be freed.
+     */
+    krb5_error_code (*get_as_key)(krb5_context context,
+                                  krb5_clpreauth_rock rock,
+                                  krb5_keyblock **keyblock);
+
+    /* Replace the reply key to be used to decrypt the AS response. */
+    krb5_error_code (*set_as_key)(krb5_context context,
+                                  krb5_clpreauth_rock rock,
+                                  const krb5_keyblock *keyblock);
 
     /* End of version 1 clpreauth callbacks. */
 } *krb5_clpreauth_callbacks;
@@ -221,12 +217,15 @@ typedef void
                                   krb5_clpreauth_modreq modreq);
 
 /*
- * Mandatory: process server-supplied data in pa_data and returns created data
- * in out_pa_data.  It is also called after the AS-REP is received if the
- * AS-REP includes preauthentication data of the associated type.  NOTE: the
- * encoded_previous_request will be NULL the first time this function is
- * called, because it is expected to only ever contain the data obtained from a
- * previous call to this function.
+ * Mandatory: process server-supplied data in pa_data and return created data
+ * in pa_data_out.  Also called after the AS-REP is received if the AS-REP
+ * includes preauthentication data of the associated type.
+ *
+ * as_key contains the client-supplied key if known, or an empty keyblock if
+ * not.  If it is empty, the module may use gak_fct to fill it in.
+ *
+ * encoded_previous_request may be NULL if there has been no previous request
+ * in the AS exchange.
  */
 typedef krb5_error_code
 (*krb5_clpreauth_process_fn)(krb5_context context,
@@ -240,16 +239,12 @@ typedef krb5_error_code
                              krb5_data *encoded_previous_request,
                              krb5_pa_data *pa_data,
                              krb5_prompter_fct prompter, void *prompter_data,
-                             krb5_clpreauth_get_as_key_fn gak_fct,
-                             void *gak_data,
-                             krb5_data *salt, krb5_data *s2kparams,
-                             krb5_keyblock *as_key,
-                             krb5_pa_data ***out_pa_data);
+                             krb5_pa_data ***pa_data_out);
 
 /*
  * Optional: Attempt to use e-data in the error response to try to recover from
  * the given error.  If this function is provided, and it stores data in
- * out_pa_data which is different data from the contents of in_pa_data, then
+ * pa_data_out which is different data from the contents of pa_data_in, then
  * the client library will retransmit the request.
  */
 typedef krb5_error_code
@@ -262,14 +257,10 @@ typedef krb5_error_code
                               krb5_kdc_req *request,
                               krb5_data *encoded_request_body,
                               krb5_data *encoded_previous_request,
-                              krb5_pa_data *in_pa_data,
+                              krb5_pa_data *pa_data_in,
                               krb5_error *error,
                               krb5_prompter_fct prompter, void *prompter_data,
-                              krb5_clpreauth_get_as_key_fn gak_fct,
-                              void *gak_data,
-                              krb5_data *salt, krb5_data *s2kparams,
-                              krb5_keyblock *as_key,
-                              krb5_pa_data ***out_pa_data);
+                              krb5_pa_data ***pa_data_out);
 
 /*
  * Optional: receive krb5_get_init_creds_opt information.  The attr and value
@@ -304,6 +295,26 @@ typedef struct krb5_clpreauth_vtable_st {
     krb5_clpreauth_supply_gic_opts_fn gic_opts;
     /* Minor version 1 ends here. */
 } *krb5_clpreauth_vtable;
+
+/*
+ * This function allows a clpreauth plugin to obtain preauth options.  The
+ * preauth_data returned from this function should be freed by calling
+ * krb5_get_init_creds_opt_free_pa().
+ */
+krb5_error_code KRB5_CALLCONV
+krb5_get_init_creds_opt_get_pa(krb5_context context,
+                               krb5_get_init_creds_opt *opt,
+                               int *num_preauth_data,
+                               krb5_gic_opt_pa_data **preauth_data);
+
+/*
+ * This function frees the preauth_data that was returned by
+ * krb5_get_init_creds_opt_get_pa().
+ */
+void KRB5_CALLCONV
+krb5_get_init_creds_opt_free_pa(krb5_context context,
+                                int num_preauth_data,
+                                krb5_gic_opt_pa_data *preauth_data);
 
 
 /*
@@ -398,21 +409,31 @@ typedef int
 (*krb5_kdcpreauth_flags_fn)(krb5_context context, krb5_preauthtype pa_type);
 
 /*
- * Optional: fill in pa_out->length and pa_out->contents with data to send to
- * the client as part of the "you need to use preauthentication" error.  If
- * this function returns non-zero, the padata type will not be included in the
- * list; if this function is not provided or returns zero without changing
- * pa_out, the padata type will be included in the list with an empty value.
- * This function not allowed to create a context because we have no guarantee
- * that the client will ever call again (or that it will hit this server if it
- * does), in which case a context might otherwise hang around forever.
+ * Responder for krb5_kdcpreauth_edata_fn.  If invoked with a non-zero code, pa
+ * will be ignored and the padata type will not be included in the hint list.
+ * If invoked with a zero code and a null pa value, the padata type will be
+ * included in the list with an empty value.  If invoked with a zero code and a
+ * non-null pa value, pa will be included in the hint list and will later be
+ * freed by the KDC.
  */
-typedef krb5_error_code
+typedef void
+(*krb5_kdcpreauth_edata_respond_fn)(void *arg, krb5_error_code code,
+                                    krb5_pa_data *pa);
+
+/*
+ * Optional: provide pa_data to send to the client as part of the "you need to
+ * use preauthentication" error.  This function is not allowed to create a
+ * modreq object because we have no guarantee that the client will ever make a
+ * follow-up request, or that it will hit this KDC if it does.
+ */
+typedef void
 (*krb5_kdcpreauth_edata_fn)(krb5_context context, krb5_kdc_req *request,
                             krb5_kdcpreauth_callbacks cb,
                             krb5_kdcpreauth_rock rock,
                             krb5_kdcpreauth_moddata moddata,
-                            krb5_pa_data *pa_out);
+                            krb5_preauthtype pa_type,
+                            krb5_kdcpreauth_edata_respond_fn respond,
+                            void *arg);
 
 /*
  * Responder for krb5_kdcpreauth_verify_fn.  Invoke with the arg parameter
@@ -487,28 +508,5 @@ typedef struct krb5_kdcpreauth_vtable_st {
     krb5_kdcpreauth_return_fn return_padata;
     krb5_kdcpreauth_free_modreq_fn free_modreq;
 } *krb5_kdcpreauth_vtable;
-
-/*
- * This function allows a preauth plugin to obtain preauth
- * options.  The preauth_data returned from this function
- * should be freed by calling krb5_get_init_creds_opt_free_pa().
- *
- * The 'opt' pointer supplied to this function must have been
- * obtained using krb5_get_init_creds_opt_alloc().
- */
-krb5_error_code KRB5_CALLCONV
-krb5_get_init_creds_opt_get_pa(krb5_context context,
-                               krb5_get_init_creds_opt *opt,
-                               int *num_preauth_data,
-                               krb5_gic_opt_pa_data **preauth_data);
-
-/*
- * This function frees the preauth_data that was returned by
- * krb5_get_init_creds_opt_get_pa().
- */
-void KRB5_CALLCONV
-krb5_get_init_creds_opt_free_pa(krb5_context context,
-                                int num_preauth_data,
-                                krb5_gic_opt_pa_data *preauth_data);
 
 #endif /* KRB5_PREAUTH_PLUGIN_H_INCLUDED */

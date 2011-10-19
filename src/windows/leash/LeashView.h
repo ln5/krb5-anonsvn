@@ -70,7 +70,10 @@ class CLeashDebugWindow;
 class CLeashView : public CFormView
 {
 private:
+////@#+Remove
+#ifndef NO_KRB4
     TicketList*         m_listKrb4;
+#endif
     TicketList*         m_listKrb5;
     TicketList*         m_listAfs;
     CLeashDebugWindow*	m_pDebugWindow;
@@ -79,7 +82,10 @@ private:
     CTreeCtrl*			m_pTree;
 	CWinApp*			m_pApp;
 	HTREEITEM			m_hPrincipal;
+////@#+Remove
+#ifndef NO_KRB4
 	HTREEITEM			m_hKerb4;
+#endif
 	HTREEITEM			m_hKerb5;
     HTREEITEM           m_hk5tkt;
 	HTREEITEM			m_hAFS;
@@ -95,7 +101,9 @@ private:
 	INT					m_largeIcons;
 	INT					m_lowTicketAlarm;
 	INT					m_hPrincipalState;
+#ifndef NO_KRB4
 	INT					m_hKerb4State;
+#endif
 	INT					m_hKerb5State;
 	INT					m_hAFSState;
     BOOL                m_bIconAdded;
@@ -103,19 +111,22 @@ private:
 
     static INT		   	m_autoRenewTickets;
     static INT          m_ticketStatusAfs;
+////Remove as well?
     static INT          m_ticketStatusKrb4;
     static INT          m_ticketStatusKrb5;
     static INT          m_autoRenewalAttempted;
 	static INT			m_warningOfTicketTimeLeftAfs;
+////Remove as well?
 	static INT			m_warningOfTicketTimeLeftKrb4;
 	static INT			m_warningOfTicketTimeLeftKrb5;
     static INT			m_warningOfTicketTimeLeftLockAfs;
+////Remove as well?
     static INT			m_warningOfTicketTimeLeftLockKrb4;
     static INT			m_warningOfTicketTimeLeftLockKrb5;
     static INT			m_updateDisplayCount;
     static INT	        m_alreadyPlayedDisplayCount;
-    static LONG			m_ticketTimeLeft;
-	static BOOL			m_lowTicketAlarmSound;
+    static time_t		m_ticketTimeLeft;
+    static BOOL			m_lowTicketAlarmSound;
     static LONG         m_timerMsgNotInProgress;
 
 	VOID ResetTreeNodes();
@@ -130,19 +141,19 @@ private:
     //void   GetRowWidthHeight(CDC* pDC, LPCSTR theString, int& nRowWidth,
     //                         int& nRowHeight, int& nCharWidth);
     static VOID	AlarmBeep();
-	static VOID	CALLBACK EXPORT TimerProc(HWND hWnd, UINT nMsg, UINT nIDEvent,
-                                          DWORD dwTime);
-	static VOID	UpdateTicketTime(TICKETINFO& ticketinfo);
-	static INT	GetLowTicketStatus(int);
-	static LONG	LeashTime();
+    static VOID	CALLBACK EXPORT TimerProc(HWND hWnd, UINT nMsg, UINT_PTR nIDEvent,
+					  DWORD dwTime);
+    static VOID	UpdateTicketTime(TICKETINFO& ticketinfo);
+    static INT	GetLowTicketStatus(int);
+    static time_t	LeashTime();
 
     void   SetTrayIcon(int nim, int state=0);
     void   SetTrayText(int nim, CString tip);
 
     BOOL   UpdateDisplay();
     static UINT InitTicket(void *);
-	static UINT RenewTicket(void *);
-	static UINT ImportTicket(void *);
+    static UINT RenewTicket(void *);
+    static UINT ImportTicket(void *);
 
 protected: // create from serialization only
 	DECLARE_DYNCREATE(CLeashView)

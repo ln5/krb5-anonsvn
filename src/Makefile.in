@@ -197,8 +197,9 @@ WINMAKEFILES=Makefile \
 	util\wshelper\Makefile \
 	windows\Makefile windows\lib\Makefile \
 	windows\cns\Makefile windows\gina\Makefile \
-	windows\gss\Makefile windows\ms2mit\Makefile \
-	windows\wintel\Makefile windows\kfwlogon\Makefile windows\leashdll\Makefile
+	windows\ms2mit\Makefile \
+	windows\wintel\Makefile windows\kfwlogon\Makefile \
+	windows\leashdll\Makefile windows\leash\Makefile
 
 ##DOS##Makefile-windows:: $(MKFDEP) $(WINMAKEFILES)
 
@@ -318,8 +319,6 @@ WINMAKEFILES=Makefile \
 ##DOS##	$(WCONFIG) config < $@.in > $@
 ##DOS##windows\gina\Makefile: windows\gina\Makefile.in $(MKFDEP)
 ##DOS##	$(WCONFIG) config < $@.in > $@
-##DOS##windows\gss\Makefile: windows\gss\Makefile.in $(MKFDEP)
-##DOS##	$(WCONFIG) config < $@.in > $@
 ##DOS##windows\ms2mit\Makefile: windows\ms2mit\Makefile.in $(MKFDEP)
 ##DOS##	$(WCONFIG) config < $@.in > $@
 ##DOS##windows\wintel\Makefile: windows\wintel\Makefile.in $(MKFDEP)
@@ -327,6 +326,8 @@ WINMAKEFILES=Makefile \
 ##DOS##windows\kfwlogon\Makefile: windows\kfwlogon\Makefile.in $(MKFDEP)
 ##DOS##	$(WCONFIG) config < $@.in > $@
 ##DOS##windows\leashdll\Makefile: windows\leashdll\Makefile.in $(MKFDEP)
+##DOS##	$(WCONFIG) config < $@.in > $@
+##DOS##windows\leash\Makefile: windows\leash\Makefile.in $(MKFDEP)
 ##DOS##	$(WCONFIG) config < $@.in > $@
 
 clean-windows:: Makefile-windows
@@ -371,8 +372,8 @@ WINFILES= \
 	ccapi/server/* ccapi/server/win/* \
 	ccapi/test/* \
 	util/windows/* windows/* windows/wshelper/* windows/lib/* windows/cns/* \
-	windows/wintel/* windows/gss/* windows/gina/* windows/ms2mit/* \
-	windows/kfwlogon/* windows/leashdll/*
+	windows/wintel/* windows/gina/* windows/ms2mit/* \
+	windows/kfwlogon/* windows/leashdll/* windows/leash/*
 
 WINBINARYFILES=	windows/*/*.ico windows/*/*.doc windows/*/*.hlp \
 	windows/*/*.hpj
@@ -550,6 +551,7 @@ install-windows::
 	copy include\profile.h "$(KRB_INSTALL_DIR)\include\."
 	copy include\com_err.h "$(KRB_INSTALL_DIR)\include\."
 	copy include\gssapi\gssapi.h "$(KRB_INSTALL_DIR)\include\gssapi\."
+	copy include\gssapi\gssapi_alloc.h "$(KRB_INSTALL_DIR)\include\gssapi\."
 	copy include\gssapi\gssapi_krb5.h "$(KRB_INSTALL_DIR)\include\gssapi\."
 	copy include\gssapi\gssapi_ext.h "$(KRB_INSTALL_DIR)\include\gssapi\."
 	copy lib\$(OUTPRE)*.lib "$(KRB_INSTALL_DIR)\lib\."
@@ -722,15 +724,22 @@ OTHEREXCLUDES = \
 	util/profile/prof_int.h \
 	util/profile/profile.hin \
 	util/profile/profile_tcl.c \
+	util/support/fnmatch.c \
 	util/verto \
-	util/k5ev
+	util/k5ev \
+	util/wshelper
 
 EXCLUDES = `for i in $(BSDFILES) $(OTHEREXCLUDES); do echo $$i; done | $(AWK) '{ print "-path", $$1, "-o" }'` -path /dev/null
 
+FIND_REINDENT = cd $(top_srcdir) && \
+	$(FIND) $(INDENTDIRS) \( $(EXCLUDES) \) -prune -o \
+	\( -name '*.[ch]' -o -name '*.hin' -o -name '*.[ch].in' \)
+
+show-reindentfiles::
+	($(FIND_REINDENT) -print)
+
 reindent::
-	(cd $(top_srcdir) && \
-	$(FIND) . \
-	\( -name '*.[ch]' -o -name '*.hin' -o -name '*.[ch].in' \) \
+	($(FIND_REINDENT) \
 	-print0 | $(XARGS) -0 $(EMACS) -q -batch \
 	-l util/krb5-c-style.el \
 	-l util/krb5-batch-reindent.el)
@@ -759,4 +768,3 @@ doxygen::
 	else \
 		echo "Doxygen is not installed or incorrect PATH"; \
 	fi
-
