@@ -627,7 +627,7 @@ otp_server_get_edata(krb5_context context,
 
     armor_key = cb->fast_armor(context, rock);
     if (armor_key == NULL) {
-        SERVER_DEBUG("No armor key found.");
+        SERVER_DEBUG("No armor key found when preparing challenge.");
         (*respond)(arg,  EINVAL, NULL);
         return;
     }
@@ -747,7 +747,7 @@ otp_server_verify_padata(krb5_context context,
 
     armor_key = cb->fast_armor(context, rock);
     if (armor_key == NULL) {
-        SERVER_DEBUG("No armor key found.");
+        SERVER_DEBUG("No armor key found when verifying padata.");
         retval = EINVAL;
         goto errout;
     }
