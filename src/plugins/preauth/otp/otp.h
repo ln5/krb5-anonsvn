@@ -29,15 +29,9 @@
 #include <krb5/krb5.h>
 #include "adm_proto.h"          /* for krb5_klog_syslog */
 
-#ifdef DEBUG
-#include <syslog.h>             /* for LOG_* */
-#define SERVER_DEBUG(body, ...) krb5_klog_syslog(LOG_DEBUG, "OTP PA: "body, \
-                                                 ##__VA_ARGS__)
-#define CLIENT_DEBUG(body, ...) fprintf(stderr, "OTP PA: "body, ##__VA_ARGS__)
-#else
-#define SERVER_DEBUG(body, ...)
-#define CLIENT_DEBUG(body, ...)
-#endif
+void SERVER_DEBUG(const char *, ...);
+void CLIENT_DEBUG(const char *, ...);
+
 
 #define OTP_METHOD_CONTEXT(c) (c)->method->context
 

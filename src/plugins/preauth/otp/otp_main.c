@@ -116,6 +116,50 @@ struct otp_method otp_methods[] = {
 };
 
 
+/**********************/
+/* Helper functions.  */
+#if defined(DEBUG)
+#include <syslog.h>             /* for LOG_* */
+#endif
+void
+SERVER_DEBUG(const char *format, ...)
+{
+#if defined(DEBUG)
+    va_list pvar;
+    char *s = NULL;
+    size_t fmtlen;
+
+    fmtlen = strlen(format) + 9;
+    s = malloc(fmtlen);
+    snprintf(s, fmtlen, "OTP PA: %s", format);
+
+    va_start(pvar, format);
+    krb5_klog_syslog(LOG_DEBUG, s ? s : format, pvar);
+    va_end(pvar);
+    free(s);
+#endif
+}
+
+void
+CLIENT_DEBUG(const char *format, ...)
+{
+#if defined(DEBUG)
+    va_list pvar;
+    char *s = NULL;
+    size_t fmtlen;
+
+    fmtlen = strlen(format) + 9;
+    s = malloc(fmtlen);
+    snprintf(s, fmtlen, "OTP PA: %s", format);
+
+    va_start(pvar, format);
+    fprintf(stderr, s ? s : format, pvar);
+    va_end(pvar);
+    free(s);
+#endif
+}
+
+
 /************/
 /* Client.  */
 static krb5_preauthtype otp_client_supported_pa_types[] = {

@@ -80,9 +80,7 @@ verify_otp(const struct otp_req_ctx *req_ctx, const char *pw)
     char *username = NULL;
     CURLcode cret = 0;
     long respcode = 0;
-#ifdef DEBUG
     char curl_errbuf[CURL_ERROR_SIZE];
-#endif
 
     ctx = OTP_METHOD_CONTEXT(req_ctx);
     assert(ctx != NULL);
