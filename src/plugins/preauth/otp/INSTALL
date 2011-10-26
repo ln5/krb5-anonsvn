@@ -1,0 +1,156 @@
+Kerberos FAST OTP plugin INSTALL file (in Emacs -*-org-*- mode)
+
+#+TITLE: Kerberos FAST OTP plugin installation and configuration
+#+EMAIL: linus@nordu.net
+
+This is the INSTALL file in the plugins/preauth/otp directory of the
+MIT Kerberos tree, describing how to get going with the One-Time
+Passoword (OTP) plugin.
+
+In order to try out the plugin you'll want to install kinit, the KDC
+and some OTP verification backend (or use someone elses).  The
+information below should be enough to get you going.
+
+* Get the source code
+
+- git clone https://github.com/ln5/krb5-anonsvn.git
+- cd krb5-anonsvn
+
+An alternative way of getting the source code if you don't do git is to visit
+
+- https://FIXME
+
+and pick a recent snapshot of the source tree.
+
+* Compile and install it
+NOTE: In order to use the 'basicauth' OTP method you'll want [[http://curl.haxx.se/][libcurl]]
+installed on your system prior to configuring Kerberos.
+
+NOTE: In order to use the 'ykclient' OTP method you'll want the
+[[https://github.com/Yubico/yubico-c-client/][Yubikey client C library]] installed on your system prior to configuring
+Kerberos.
+
+- ./configure --enable-otp-preauth
+- make all install
+
+If you want debug output from the OTP plugin in kinit and the KDC,
+compile the plugin with =-DDEBUG=.
+- make -C plugins/preauth/otp CFLAGS="-Wall -g -DDEBUG" clean all install
+* Configure the KDC
+- Configure the OTP method(s) you intend to use for you realm.  Here's
+  an example of how to configure =basicauth=:
+
+#+BEGIN_EXAMPLE
+[realms]
+	EXAMPLE.COM = {
+		otp_basicauth_url_template = https://otp-verification.example.com/
+	}
+#+END_EXAMPLE
+
+- You'll want to enable the OTP plugin in =etc/krb5.conf=.
+
+#+BEGIN_EXAMPLE
+[plugins]
+	enable_only = otp
+	kdcpreauth = {
+		   module = otp:preauth/otp.so
+        }
+	clpreauth = {
+		  module = otp:preauth/otp.so
+        }
+#+END_EXAMPLE
+* Add a principal to the Kerberos database
+- Create a normal principal using kadmin.
+- Set the =requires_preauth= attribute.
+- Add a string attribute =otp-token1= providing the OTP token identity
+  and the name of the OTP method to be used for OTP verification.
+
+Here's an example of how to create =mit0@EXAMPLE.COM= and configure
+=basicauth= as the OTP method to use for authentication.
+#+BEGIN_EXAMPLE
+$ kadmin.local 
+kadmin.local:  ank -randkey +requires_preauth mit0
+Principal "mit0@EXAMPLE.COM" created.
+kadmin.local:  set_string mit0 otp-token1 mit0:basicauth
+Attribute set for principal "mit0@EXAMPLE.COM".
+#+END_EXAMPLE
+* Start the KDC
+- krb5kdc -n
+
+If you want debug printouts from the KDC on standard output, set
+=KRB5_TRACE= to =/dev/stdout= before starting the KDC.
+- KRB5\_TRACE=/dev/stdout krb5kdc -n
+* Get yourself an OTP token
+** You have a Yubikey OTP token
+The [[http://www.yubico.com/yubikey][Yubikey token]] can be used in one of three modes -- Yubico mode,
+OATH-HOTP mode and Challenge-response mode.
+
+The OTP plugin can authenticate a Yubikey in Yubico mode through the
+'ykclient' method.
+
+The OTP plugin can authenticate a Yubikey in OATH-HOTP mode through
+the 'basicauth' method, given that the KDC can connect to a
+verification backend making itself available over HTTP or HTTPS using
+HTTP Basic Authentication for authentication.
+*** Install ykpersonalize
+- https://github.com/Yubico/yubikey-personalization
+
+This will in addition to ykpersonalize(1) give you modhex(1), neat for
+converting from ASCII hex representation to the Yubikey ASCII "modhex"
+representation, chosen for being in the same place on most keyboard
+layouts (equivalent to
+=tr "[0123456789abcdef]" "[cbdefghijklnrtuv]"=).
+*** Configure your Yubikey using ykpersonalize
+**** OATH-HOTP mode
+Pick a Yubikey public identity (1), a uid (aabbccddee00) and a 20 character AES key (12345678901234567890)
+: ykpersonalize -y -ooath-hotp -ofixed=h:280000000001 -ouid=aabbccddee00 -a$(echo -n 12345678901234567890 | hexdump -e \"%02x\")
+**** Yubico mode
+Pick a Yubikey public identity (1), a uid (aabbccddee00) and a 16 character AES key (1234567890123456)
+: ykpersonalize -y -ofixed=h:280000000001 -ouid=aabbccddee00 -a$(echo -n 1234567890123456 | hexdump -e \"%02x\")
+** You don't have any of the above mentioned hardware tokens
+You can use a program for generating a one-time password.
+[XXX add links]
+*** The Oathtool package
+Oathtool can be used for generating OATH OTP's, both HOTP and TOTP.
+- oathtool -d <OTP-length> -c <counter> <key>
+[XXX add links]
+*** iPhone application "OATH Token"
+Visit https://kfo-dev.nordu.net/ for the following links.
+- [[http://itunes.apple.com/us/app/oath-token/id364017137%3Fmt%3D8][OATH Token in Apple's appstore]]
+- [[http://kfo-dev.nordu.net/cgi-bin/gentoken.cgi][Generate a token]] in the NORDUnet test site, page protected with
+  Basic Authentication
+- [[https://kfo-dev.nordu.net/protected][Test your token]] in the NORDUnet test site
+* Generate an OTP
+- Using Oathtool:
+  - foo
+- Using a Yubikey in OATH mode
+  - bar
+- Using a Yubikey in Yubico mode
+  - bletch
+- Using the iPhone OATH Token application 
+  - xyzzy
+* Get a FAST armor key
+There are three options.
+- Sticking a srvtab in /etc/
+- Use PKINIT, supposedly anonymous PKINIT
+- Get a TGT for an "ordinary" user with a long-term shared secret
+* Use the OTP for authenticate with the KDC
+- kinit -T <ccache> -X OTP=<otp> <principal>
+Example:
+: kinit -T /tmp/krb5cc_1000 -X OTP=123456 mit0
+* Setting up OTP verification backend systems
+If noone is providing you with a OTP backend system, you'll have to
+set one up yourself.
+** Apache module mod\_authn\_otp, for OATH HOTP tokens
+- http://mod-authn-otp.googlecode.com/
+- On a Debian-based system, the user database is being kept in
+  =/var/lib/apache2/otpusers.db=, see
+  https://code.google.com/p/mod-authn-otp/wiki/UsersFile for details
+  on the format.
+- Add basic auth protecting the [[https://kfo-dev.nordu.net/cgi-bin/gentoken.cgi][token generation page]]
+#+BEGIN_EXAMPLE
+  sudo htpasswd -b /etc/htpasswd mit0 mit0
+#+END_EXAMPLE
+- Visit the [[https://kfo-dev.nordu.net/cgi-bin/gentoken.cgi][token generation page]] to get your token
+** yubiserve, for a Yubikey token in Yubico mode or OATH mode
+[XXX]
