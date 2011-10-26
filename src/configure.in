@@ -1156,16 +1156,33 @@ AC_SUBST(sam2_plugin)
 CFLAGS=$old_CFLAGS
 
 # This check is for plugins/preauth/otp.
-AC_CHECK_LIB(curl, curl_global_init,
-  	     [otp_preauth_plugin=plugins/preauth/otp], [otp_preauth_plugin=])
-AC_CHECK_LIB(ykclient, ykclient_init,
-             [otp_preauth_plugin=plugins/preauth/otp], [otp_preauth_plugin=])
-if test -n "$otp_preauth_plugin"; then
-  AC_MSG_NOTICE([Found all dependencies for OTP preauth plugin, enabling.])
-else
-  AC_MSG_NOTICE([All dependencies not found for OTP preauth plugin, disabling.])
+otp_preauth_plugin=
+otp_libs=
+otp_objs=
+AH_TEMPLATE([OTP_PREAUTH_ENABLE_BASICAUTH], [Define to build OTP method basicauth.])
+AH_TEMPLATE([OTP_PREAUTH_ENABLE_YKCLIENT], [Define to build OTP method ykclient.])
+AC_ARG_ENABLE(otp_preauth,
+	      AC_HELP_STRING([--enable-otp-preauth],
+		             [build with OTP preauth support [default=no]]),
+	      [case $enableval in
+	        yes|no) ;;
+	        *) AC_MSG_ERROR([bad value $enableval for --enable-otp-preauth, need yes or no]) ;;
+	      esac],
+	      [enable_otp_preauth=no])
+if test "$enable_otp_preauth" = "yes"; then
+   otp_preauth_plugin=plugins/preauth/otp
+   AC_CHECK_LIB([curl], [curl_global_init],
+                AC_DEFINE([OTP_PREAUTH_ENABLE_BASICAUTH], 1)
+		[otp_libs="$otp_libs -lcurl"]
+		[otp_objs="$otp_objs m_basicauth.o"])
+   AC_CHECK_LIB([ykclient], [ykclient_init],
+                AC_DEFINE([OTP_PREAUTH_ENABLE_YKCLIENT], 1)
+		[otp_libs="$otp_libs -lykclient"]
+		[otp_objs="$otp_objs m_ykclient.o"])
 fi
 AC_SUBST(otp_preauth_plugin)
+AC_SUBST(otp_libs)
+AC_SUBST(otp_objs)
 
 # This checks is for plugins/locate/python, which isn't built by
 # default, so it's not a big deal that it isn't very good.  We should

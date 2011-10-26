@@ -97,13 +97,21 @@
 #define TOKEN_ID_LENGTH 12
 
 #include "otp.h"
+#if defined (OTP_PREAUTH_ENABLE_BASICAUTH)
 #include "m_basicauth.h"
+#endif
+#if defined (OTP_PREAUTH_ENABLE_YKCLIENT)
 #include "m_ykclient.h"
+#endif
 
 /* Configured OTP methods.  */
 struct otp_method otp_methods[] = {
+#if defined (OTP_PREAUTH_ENABLE_BASICAUTH)
     {"basicauth", otp_basicauth_server_init, 0, NULL, NULL},
+#endif
+#if defined (OTP_PREAUTH_ENABLE_YKCLIENT)
     {"ykclient", otp_ykclient_server_init, 0, NULL, NULL},
+#endif
     {NULL, NULL, 0, NULL, NULL}
 };
 
