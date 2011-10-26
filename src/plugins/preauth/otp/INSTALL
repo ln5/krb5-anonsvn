@@ -16,9 +16,10 @@ information below should be enough to get you going.
 - git clone https://github.com/ln5/krb5-anonsvn.git
 - cd krb5-anonsvn
 
-An alternative way of getting the source code if you don't do git is to visit
+An alternative way of getting the source code if you don't do git is
+to visit
 
-- https://FIXME
+- https://nodeload.github.com/ln5/krb5-anonsvn/tarball/fast-otp
 
 and pick a recent snapshot of the source tree.
 
