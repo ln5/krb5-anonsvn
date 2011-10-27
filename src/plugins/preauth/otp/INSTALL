@@ -104,7 +104,7 @@ layouts (equivalent to
 *** Configure your Yubikey using ykpersonalize
 **** OATH-HOTP mode
 Pick a Yubikey public identity (1), a uid (aabbccddee00) and a 20 character AES key (12345678901234567890)
-: ykpersonalize -y -ooath-hotp -ofixed=h:280000000001 -ouid=aabbccddee00 -a$(echo -n 12345678901234567890 | hexdump -e \"%02x\")
+: ykpersonalize -y -ooath-hotp -ofixed=h:280000000001 -a$(echo -n 12345678901234567890 | hexdump -e \"%02x\")
 **** Yubico mode
 Pick a Yubikey public identity (1), a uid (aabbccddee00) and a 16 character AES key (1234567890123456)
 : ykpersonalize -y -ofixed=h:280000000001 -ouid=aabbccddee00 -a$(echo -n 1234567890123456 | hexdump -e \"%02x\")
