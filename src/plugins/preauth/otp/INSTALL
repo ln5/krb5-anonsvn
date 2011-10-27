@@ -9,7 +9,7 @@ Passoword (OTP) plugin.
 
 In order to try out the plugin you'll want to install kinit, the KDC
 and some OTP verification backend (or use someone elses).  The
-information below should be enough to get you going.
+information in this document should be enough to get you going.
 
 * Get the source code
 
