@@ -109,12 +109,10 @@ Pick a Yubikey public identity (1), a uid (aabbccddee00) and a 20 character AES 
 Pick a Yubikey public identity (1), a uid (aabbccddee00) and a 16 character AES key (1234567890123456)
 : ykpersonalize -y -ofixed=h:280000000001 -ouid=aabbccddee00 -a$(echo -n 1234567890123456 | hexdump -e \"%02x\")
 ** You don't have any of the above mentioned hardware tokens
-You can use a program for generating a one-time password.
-[XXX add links]
-*** The Oathtool package
-Oathtool can be used for generating OATH OTP's, both HOTP and TOTP.
+You can use a program for generating one-time passwords.
+*** The Oath-toolkit package
+[[http://freshmeat.net/projects/oath-toolkit][OATH Toolkit]] can be used for generating OATH OTP's, both HOTP and TOTP.
 - oathtool -d <OTP-length> -c <counter> <key>
-[XXX add links]
 *** iPhone application "OATH Token"
 Visit https://kfo-dev.nordu.net/ for the following links.
 - [[http://itunes.apple.com/us/app/oath-token/id364017137%3Fmt%3D8][OATH Token in Apple's appstore]]
@@ -122,14 +120,17 @@ Visit https://kfo-dev.nordu.net/ for the following links.
   Basic Authentication
 - [[https://kfo-dev.nordu.net/protected][Test your token]] in the NORDUnet test site
 * Generate an OTP
-- Using Oathtool:
-  - foo
-- Using a Yubikey in OATH mode
-  - bar
-- Using a Yubikey in Yubico mode
-  - bletch
+- Using oathtool
+: $ oathtool -c a1b50a9c395774cf7071fb07d40243d208adf390
+: 531329
+- Using a Yubikey in OATH mode or Yubico mode
+  - Insert the token in a USB slot
+  - Point your cursor at a good place to paste a password
+  - Press the key
 - Using the iPhone OATH Token application 
-  - xyzzy
+  - Start the application
+  - Select a token from the list
+  - Press "Generate New Password"
 * Get a FAST armor key
 There are three options.
 - Sticking a srvtab in /etc/
@@ -138,7 +139,7 @@ There are three options.
 * Use the OTP for authenticate with the KDC
 - kinit -T <ccache> -X OTP=<otp> <principal>
 Example:
-: kinit -T /tmp/krb5cc_1000 -X OTP=123456 mit0
+: $ kinit -T /tmp/krb5cc_1000 -X OTP=123456 mit0
 * Setting up OTP verification backend systems
 If noone is providing you with a OTP backend system, you'll have to
 set one up yourself.
@@ -149,9 +150,17 @@ set one up yourself.
   https://code.google.com/p/mod-authn-otp/wiki/UsersFile for details
   on the format.
 - Add basic auth protecting the [[https://kfo-dev.nordu.net/cgi-bin/gentoken.cgi][token generation page]]
-#+BEGIN_EXAMPLE
-  sudo htpasswd -b /etc/htpasswd mit0 mit0
-#+END_EXAMPLE
+: $ sudo htpasswd -b /etc/htpasswd mit0 mit0
 - Visit the [[https://kfo-dev.nordu.net/cgi-bin/gentoken.cgi][token generation page]] to get your token
+
+  - If you're on an iPhone with the OATH Token app installed, use the
+    Safari browser and your token will be installed to the app.
+
+  - If you're using the Oathtool-toolkit, use any browser or curl to get the key
+
+#+BEGIN_EXAMPLE
+  $ curl --basic --user mit1:mit1 http://kfo-dev.nordu.net/cgi-bin/gentoken.cgi
+<html><body><a href="oathtoken:///addToken?name=mit1&key=a1b50a9c395774cf7071fb07d40243d208adf390">here is your token</a></body></html>
+#+END_EXAMPLE
 ** yubiserve, for a Yubikey token in Yubico mode or OATH mode
 [XXX]
