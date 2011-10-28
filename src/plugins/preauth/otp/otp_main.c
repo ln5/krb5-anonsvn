@@ -131,10 +131,10 @@ SERVER_DEBUG(const char *format, ...)
 
     fmtlen = strlen(format) + 9;
     s = malloc(fmtlen);
-    snprintf(s, fmtlen, "OTP PA: %s", format);
-
+    if (s != NULL)
+        snprintf(s, fmtlen, "OTP PA: %s", format);
     va_start(pvar, format);
-    krb5_klog_syslog(LOG_DEBUG, s ? s : format, pvar);
+    krb5_klog_vsyslog(LOG_DEBUG, s ? s : format, pvar);
     va_end(pvar);
     free(s);
 #endif
@@ -150,10 +150,10 @@ CLIENT_DEBUG(const char *format, ...)
 
     fmtlen = strlen(format) + 9;
     s = malloc(fmtlen);
-    snprintf(s, fmtlen, "OTP PA: %s", format);
-
+    if (s != NULL)
+        snprintf(s, fmtlen, "OTP PA: %s", format);
     va_start(pvar, format);
-    fprintf(stderr, s ? s : format, pvar);
+    vfprintf(stderr, s ? s : format, pvar);
     va_end(pvar);
     free(s);
 #endif
