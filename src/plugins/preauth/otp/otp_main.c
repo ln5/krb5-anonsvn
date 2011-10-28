@@ -568,6 +568,8 @@ get_config(struct otp_server_ctx *otp_ctx,
     k5_ctx = otp_ctx->krb5_context;
     assert(k5_ctx != NULL);
 
+    /* FIXME: use krb5_get_profile rather than doing this */
+
     if (realm == NULL) {
         realm = k5_ctx->default_realm;
     }
@@ -824,6 +826,10 @@ otp_server_verify_padata(krb5_context context,
         retval = KRB5KDC_ERR_PREAUTH_FAILED;
         goto errout;
     }
+
+    /* FIXME: Use krb5int_check_clockskew() rather than using
+       context->clockskew ourselves -- krb5_context is not public.
+       Have to wait for it to become public though.  */
     ts_sec = ntohl(*((uint32_t *) (decrypted_data.data + armor_key->length)));
     ts_usec = ntohl(*((uint32_t *) (decrypted_data.data + armor_key->length + 4)));
     if (labs(now_sec - ts_sec) > context->clockskew
@@ -831,7 +837,7 @@ otp_server_verify_padata(krb5_context context,
             && ((now_sec > ts_sec && now_usec > ts_usec)
                 || (now_sec < ts_sec && now_usec < ts_usec)))) {
         SERVER_DEBUG("Bad timestamp in PA-OTP-ENC-REQUEST.");
-        retval = KRB5KDC_ERR_PREAUTH_FAILED; /* FIXME: KRB_APP_ERR_SKEW?  */
+        retval = KRB5KRB_AP_ERR_SKEW;
         goto errout;
     }
     krb5_free_data_contents(context, &decrypted_data);
@@ -873,6 +879,7 @@ otp_server_verify_padata(krb5_context context,
         retval = KRB5KDC_ERR_PREAUTH_FAILED;
         goto errout;
     }
+
 
     enc_tkt_reply->flags |= TKT_FLG_PRE_AUTH;
     enc_tkt_reply->flags |= TKT_FLG_HW_AUTH; /* FIXME: Let the OTP
