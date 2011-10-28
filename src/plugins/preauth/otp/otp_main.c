@@ -571,11 +571,13 @@ get_config(struct otp_server_ctx *otp_ctx,
     retval = krb5_get_profile(k5_ctx, &profile);
     if (retval != 0) {
         SERVER_DEBUG("%s: krb5_get_profile error: %d.", __func__, retval);
-        return NULL;
+        goto out;
     }
     if (realm == NULL) {
         retval = krb5_get_default_realm(k5_ctx, &realm_copy);
         if (retval != 0) {
+            SERVER_DEBUG("%s:  krb5_get_default_realm error: %d.", __func__,
+                         retval);
             goto out;
         }
         realm = realm_copy;
@@ -585,6 +587,7 @@ get_config(struct otp_server_ctx *otp_ctx,
     if (retval != 0) {
         SERVER_DEBUG("%s: profile_get_string error: %d.", __func__, retval);
         result = NULL;
+        goto out;
     }
 
  out:
