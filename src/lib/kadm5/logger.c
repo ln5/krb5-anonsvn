@@ -799,15 +799,15 @@ severity2string(int severity)
  *                        also performing the logging redirection as specified
  *                        by krb5_klog_init().
  */
-static int
-klog_vsyslog(int priority, const char *format, va_list arglist)
+int
+krb5_klog_vsyslog(int priority, const char *format, va_list arglist)
 #if !defined(__cplusplus) && (__GNUC__ > 2)
     __attribute__((__format__(__printf__, 2, 0)))
 #endif
     ;
 
-static int
-klog_vsyslog(int priority, const char *format, va_list arglist)
+int
+krb5_klog_vsyslog(int priority, const char *format, va_list arglist)
 {
     char        outbuf[KRB5_KLOG_MAX_ERRMSG_SIZE];
     int         lindex;
@@ -930,7 +930,7 @@ krb5_klog_syslog(int priority, const char *format, ...)
     va_list     pvar;
 
     va_start(pvar, format);
-    retval = klog_vsyslog(priority, format, pvar);
+    retval = krb5_klog_vsyslog(priority, format, pvar);
     va_end(pvar);
     return(retval);
 }
