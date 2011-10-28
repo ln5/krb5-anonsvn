@@ -31,6 +31,7 @@ NOTE: In order to use the 'ykclient' OTP method you'll want the
 [[https://github.com/Yubico/yubico-c-client/][Yubikey client C library]] installed on your system prior to configuring
 Kerberos.
 
+- autoreconf -i
 - ./configure --enable-otp-preauth
 - make all install
 
