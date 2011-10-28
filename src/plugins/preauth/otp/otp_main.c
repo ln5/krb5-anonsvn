@@ -556,30 +556,44 @@ otp_server_create_req_ctx(struct otp_server_ctx *ctx,
 
 static char *
 get_config(struct otp_server_ctx *otp_ctx,
-           const char *realm_in,
+           const char *realm,
            const char *str)
 {
-    krb5_context k5_ctx = NULL;
     krb5_error_code retval = 0;
+    krb5_context k5_ctx = NULL;
+    char *realm_copy = NULL;
+    profile_t profile = NULL;
     char *result = NULL;
-    const char *realm = realm_in;
-    assert(otp_ctx != NULL);
 
+    assert(otp_ctx != NULL);
     k5_ctx = otp_ctx->krb5_context;
     assert(k5_ctx != NULL);
-
-    /* FIXME: use krb5_get_profile rather than doing this */
-
-    if (realm == NULL) {
-        realm = k5_ctx->default_realm;
+    retval = krb5_get_profile(k5_ctx, &profile);
+    if (retval != 0) {
+        SERVER_DEBUG("%s: krb5_get_profile error: %d.", __func__, retval);
+        return NULL;
     }
-    retval = profile_get_string(k5_ctx->profile, KRB5_CONF_REALMS, realm, str,
-                                NULL, &result);
+    if (realm == NULL) {
+        retval = krb5_get_default_realm(k5_ctx, &realm_copy);
+        if (retval != 0) {
+            goto out;
+        }
+        realm = realm_copy;
+    }
+    retval = profile_get_string(profile, KRB5_CONF_REALMS, realm, str, NULL,
+                                &result);
     if (retval != 0) {
         SERVER_DEBUG("%s: profile_get_string error: %d.", __func__, retval);
         result = NULL;
     }
 
+ out:
+    if (realm_copy != NULL) {
+        krb5_free_default_realm(k5_ctx, realm_copy);
+        realm_copy = NULL;
+    }
+    profile_release(profile);
+    profile = NULL;
     return result;
 }
 
