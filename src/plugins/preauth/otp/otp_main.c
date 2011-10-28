@@ -447,7 +447,8 @@ otp_server_pick_token(struct otp_server_ctx *ctx,
         retval = ENOMEM;
         goto out;
     }
-    /* TODO: Support more than 9 OTP tokens per principal.  */
+    /* TODO: Support more than 10 OTP tokens per principal (otp-token0
+       to otp-token9).  */
     token_id = method_name = blob = NULL;
     for (f = 0; f < 10; f++, key[9]--) {
         pa_cb->free_string(ctx->krb5_context, rock, val);
