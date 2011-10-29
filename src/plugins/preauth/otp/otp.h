@@ -29,7 +29,7 @@
 #include <krb5/krb5.h>
 #include "adm_proto.h"          /* for krb5_klog_syslog */
 
-void SERVER_DEBUG(const char *, ...);
+void SERVER_DEBUG(errcode_t, const char *, ...);
 void CLIENT_DEBUG(const char *, ...);
 
 

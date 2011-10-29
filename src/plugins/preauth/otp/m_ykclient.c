@@ -65,7 +65,7 @@ verify_otp(const struct otp_req_ctx *req_ctx, const char *pw)
     assert(ctx != NULL);
 
     if (pw == NULL) {
-        SERVER_DEBUG("[ykclient] OTP is missing.");
+        SERVER_DEBUG(EINVAL, "[ykclient] OTP is missing.");
         return EINVAL;
     }
 
@@ -105,7 +105,7 @@ otp_ykclient_server_init(struct otp_server_ctx *otp_ctx,
     /* Initialize ykclient.  */
     retval = ykclient_init(&ctx->yk_ctx);
     if (retval != YKCLIENT_OK) {
-        SERVER_DEBUG("[ykclient] ykclient_init failed.\n");
+        SERVER_DEBUG(retval, "[ykclient] ykclient_init failed.\n");
         retval += 200;
         assert(ctx->yk_ctx == NULL);
         goto errout;
@@ -115,12 +115,12 @@ otp_ykclient_server_init(struct otp_server_ctx *otp_ctx,
     /* Set URL.  */
     ctx->url_template = get_config(otp_ctx, NULL, YUBIKEY_URL_TEMPLATE);
     if (ctx->url_template != NULL) {
-        SERVER_DEBUG("[ykclient] URL template: [%s]", ctx->url_template);
+        SERVER_DEBUG(0, "[ykclient] URL template: [%s]", ctx->url_template);
         ykclient_set_url_template(ctx->yk_ctx, ctx->url_template);
     }
     else {
-        SERVER_DEBUG("[ykclient] Failed to retrive URL template.");
         retval = ENOENT;
+        SERVER_DEBUG(retval, "[ykclient] Failed to retrive URL template.");
         goto errout;
     }
 
@@ -139,9 +139,9 @@ otp_ykclient_server_init(struct otp_server_ctx *otp_ctx,
         ykclient_set_client(ctx->yk_ctx, client_id, 0, NULL);
     }
     else {
-        SERVER_DEBUG("[ykclient] Invalid client id in config: [%s]\n",
-                     client_id_str);
         retval = EINVAL;
+        SERVER_DEBUG(retval, "[ykclient] Invalid client id in config: [%s]\n",
+                     client_id_str);
         goto errout;
     }
 

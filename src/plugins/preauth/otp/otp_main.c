@@ -118,25 +118,15 @@ struct otp_method otp_methods[] = {
 
 /**********************/
 /* Helper functions.  */
-#if defined(DEBUG)
-#include <syslog.h>             /* for LOG_* */
-#endif
 void
-SERVER_DEBUG(const char *format, ...)
+SERVER_DEBUG(errcode_t code, const char *format, ...)
 {
 #if defined(DEBUG)
-    va_list pvar;
-    char *s = NULL;
-    size_t fmtlen;
+    va_list ap;
 
-    fmtlen = strlen(format) + 9;
-    s = malloc(fmtlen);
-    if (s != NULL)
-        snprintf(s, fmtlen, "OTP PA: %s", format);
-    va_start(pvar, format);
-    krb5_klog_vsyslog(LOG_DEBUG, s ? s : format, pvar);
-    va_end(pvar);
-    free(s);
+    va_start(ap, format);
+    com_err_va("OTP PA", code, format, ap);
+    va_end(ap);
 #endif
 }
 
@@ -478,7 +468,7 @@ otp_server_pick_token(struct otp_server_ctx *ctx,
     }
 
     if (token_id == NULL) {
-        SERVER_DEBUG("Token id not found for principal.");
+        SERVER_DEBUG(ENOENT, "Token id not found for principal.");
         retval = ENOENT;
         goto out;
     }
@@ -489,7 +479,7 @@ otp_server_pick_token(struct otp_server_ctx *ctx,
         }
     }
     if (*method_out == NULL) {
-        SERVER_DEBUG("Authentication method %s not configured.", method_name);
+        SERVER_DEBUG(ENOENT, "Authentication method %s not configured.", method_name);
         retval = ENOENT;
         goto out;
     }
@@ -543,12 +533,12 @@ otp_server_create_req_ctx(struct otp_server_ctx *ctx,
     retval = otp_server_pick_token(ctx, rock, token_id_hint, pa_cb,
                                    &req->token_id, &req->method, &req->blob);
     if (retval != 0) {
-        SERVER_DEBUG("Error getting OTP info for principal: %d.", retval);
+        SERVER_DEBUG(retval, "Error getting OTP info for principal: %d.", retval);
         otp_server_free_req_ctx(&req);
         return retval;
     }
 
-    SERVER_DEBUG("Token id [%s] found; method [%s], blob [%s].",
+    SERVER_DEBUG(0, "Token id [%s] found; method [%s], blob [%s].",
                  req->token_id, req->method->name, req->blob ? req->blob : "");
     *req_out = req;
     return 0;
@@ -570,14 +560,14 @@ get_config(struct otp_server_ctx *otp_ctx,
     assert(k5_ctx != NULL);
     retval = krb5_get_profile(k5_ctx, &profile);
     if (retval != 0) {
-        SERVER_DEBUG("%s: krb5_get_profile error: %d.", __func__, retval);
+        SERVER_DEBUG(retval, "%s: krb5_get_profile error.", __func__);
         goto out;
     }
     if (realm == NULL) {
         retval = krb5_get_default_realm(k5_ctx, &realm_copy);
         if (retval != 0) {
-            SERVER_DEBUG("%s:  krb5_get_default_realm error: %d.", __func__,
-                         retval);
+            SERVER_DEBUG(retval, "%s:  krb5_get_default_realm error.",
+                         __func__);
             goto out;
         }
         realm = realm_copy;
@@ -585,7 +575,7 @@ get_config(struct otp_server_ctx *otp_ctx,
     retval = profile_get_string(profile, KRB5_CONF_REALMS, realm, str, NULL,
                                 &result);
     if (retval != 0) {
-        SERVER_DEBUG("%s: profile_get_string error: %d.", __func__, retval);
+        SERVER_DEBUG(retval, "%s: profile_get_string error.", __func__);
         result = NULL;
         goto out;
     }
@@ -613,7 +603,7 @@ server_init_methods(struct otp_server_ctx *ctx)
             m->enabled_flag = 1;
         }
         else {
-            SERVER_DEBUG("Failing init for method [%s]: %d.", m->name, err);
+            SERVER_DEBUG(err, "Failing init for method [%s].", m->name);
         }
     }
 }
@@ -699,7 +689,7 @@ otp_server_get_edata(krb5_context context,
 
     armor_key = cb->fast_armor(context, rock);
     if (armor_key == NULL) {
-        SERVER_DEBUG("No armor key found when preparing challenge.");
+        SERVER_DEBUG(EINVAL, "No armor key found when preparing challenge.");
         (*respond)(arg,  EINVAL, NULL);
         return;
     }
@@ -722,13 +712,14 @@ otp_server_get_edata(krb5_context context,
     }
     retval = krb5_c_random_make_octets(context, &otp_challenge.nonce);
     if (retval != 0) {
-        SERVER_DEBUG("Unable to create random data for nonce.");
+        SERVER_DEBUG(retval, "Unable to create random data for nonce.");
         (*respond)(arg, retval, NULL);
         return;
     }
-    if (krb5_us_timeofday(context, &now_sec, &now_usec) != 0) {
-        SERVER_DEBUG("Unable to get current time.");
-        (*respond)(arg, KRB5KDC_ERR_PREAUTH_FAILED, NULL);
+    retval = krb5_us_timeofday(context, &now_sec, &now_usec);
+    if (retval != 0) {
+        SERVER_DEBUG(retval, "Unable to get current time.");
+        (*respond)(arg, retval, NULL);
         return;
     }
     *((uint32_t *) (otp_challenge.nonce.data + armor_key->length)) =
@@ -750,7 +741,7 @@ otp_server_get_edata(krb5_context context,
     retval = encode_krb5_pa_otp_challenge(&otp_challenge,
                                           &encoded_otp_challenge);
     if (retval != 0) {
-        SERVER_DEBUG("Unable to encode challenge.");
+        SERVER_DEBUG(retval, "Unable to encode challenge.");
         free(otp_challenge.otp_tokeninfo);
         (*respond)(arg, retval, NULL);
         return;
@@ -789,8 +780,9 @@ otp_server_verify_padata(krb5_context context,
     krb5_int32 now_usec, ts_usec;
 
     if (otp_ctx == NULL) {
-        SERVER_DEBUG("No OTP server context found when verifying padata.");
-        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        retval = EINVAL;
+        SERVER_DEBUG(retval,
+                     "No OTP server context found when verifying padata.");
         goto errout;
     }
 
@@ -799,14 +791,13 @@ otp_server_verify_padata(krb5_context context,
 
     retval = decode_krb5_pa_otp_req(&encoded_otp_req, &otp_req);
     if (retval != 0) {
-        SERVER_DEBUG("Unable to decode OTP request.");
-        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        SERVER_DEBUG(retval, "Unable to decode OTP request.");
         goto errout;
     }
 
     if (otp_req->enc_data.ciphertext.data == NULL) {
-        SERVER_DEBUG("Missing encData in PA-OTP-REQUEST.");
-        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        retval = EINVAL;
+        SERVER_DEBUG(retval, "Missing encData in PA-OTP-REQUEST.");
         goto errout;
     }
 
@@ -819,28 +810,27 @@ otp_server_verify_padata(krb5_context context,
 
     armor_key = cb->fast_armor(context, rock);
     if (armor_key == NULL) {
-        SERVER_DEBUG("No armor key found when verifying padata.");
         retval = EINVAL;
+        SERVER_DEBUG(retval, "No armor key found when verifying padata.");
         goto errout;
     }
 
     retval = krb5_c_decrypt(context, armor_key, KRB5_KEYUSAGE_PA_OTP_REQUEST,
                             NULL, &otp_req->enc_data, &decrypted_data);
     if (retval != 0) {
-        SERVER_DEBUG("Unable to decrypt encData in PA-OTP-REQUEST.");
-        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        SERVER_DEBUG(retval, "Unable to decrypt encData in PA-OTP-REQUEST.");
         goto errout;
     }
 
     /* Verify the server nonce (PA-OTP-ENC-REQUEST).  */
     if (decrypted_data.length != 8 + armor_key->length) {
-        SERVER_DEBUG("Invalid server nonce length.");
-        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        retval = EINVAL;
+        SERVER_DEBUG(retval, "Invalid server nonce length.");
         goto errout;
     }
     if (krb5_us_timeofday(context, &now_sec, &now_usec)) {
-        SERVER_DEBUG("Unable to get current time.");
-        retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        retval = EINVAL;
+        SERVER_DEBUG(retval, "Unable to get current time.");
         goto errout;
     }
 
@@ -853,8 +843,8 @@ otp_server_verify_padata(krb5_context context,
         || (labs(now_sec - ts_sec) == context->clockskew
             && ((now_sec > ts_sec && now_usec > ts_usec)
                 || (now_sec < ts_sec && now_usec < ts_usec)))) {
-        SERVER_DEBUG("Bad timestamp in PA-OTP-ENC-REQUEST.");
         retval = KRB5KRB_AP_ERR_SKEW;
+        SERVER_DEBUG(retval, "Bad timestamp in PA-OTP-ENC-REQUEST.");
         goto errout;
     }
     krb5_free_data_contents(context, &decrypted_data);
@@ -865,7 +855,7 @@ otp_server_verify_padata(krb5_context context,
         retval = ENOMEM;
         goto errout;
     }
-    SERVER_DEBUG("Got OTP [%s].", otp);
+    SERVER_DEBUG(0, "Got OTP [%s].", otp);
     if (otp_req->otp_token_id.data != NULL) {
         tokenid = strndup(otp_req->otp_token_id.data,
                           otp_req->otp_token_id.length);
@@ -873,7 +863,7 @@ otp_server_verify_padata(krb5_context context,
             retval = ENOMEM;
             goto errout;
         }
-        SERVER_DEBUG("Got tokenid hint [%s].", tokenid);
+        SERVER_DEBUG(0, "Got tokenid hint [%s].", tokenid);
     }
 
     /* Create request context.  */
@@ -891,9 +881,9 @@ otp_server_verify_padata(krb5_context context,
     otp = NULL;
 
     if (ret != 0) {
-        SERVER_DEBUG("Verification for [%s] failed with %d.",
-                     req_ctx->token_id, ret);
         retval = KRB5KDC_ERR_PREAUTH_FAILED;
+        SERVER_DEBUG(retval, "Verification for [%s] failed with %d.",
+                     req_ctx->token_id, ret);
         goto errout;
     }
 
@@ -902,7 +892,7 @@ otp_server_verify_padata(krb5_context context,
     enc_tkt_reply->flags |= TKT_FLG_HW_AUTH; /* FIXME: Let the OTP
                                                 method decide about
                                                 the HW flag?  */
-    SERVER_DEBUG("Verification succeeded for [%s].", req_ctx->token_id);
+    SERVER_DEBUG(0, "Verification succeeded for [%s].", req_ctx->token_id);
 
     /* Request context is consumed by the free_modreq_fn.  */
     (*respond)(arg, 0, (krb5_kdcpreauth_modreq) req_ctx, NULL, NULL);
@@ -935,20 +925,20 @@ otp_server_return_padata(krb5_context context,
     krb5_error_code retval = -1;
 
     if (modreq == NULL) {
-        SERVER_DEBUG("Not handled by me.");
+        SERVER_DEBUG(0, "Not handled by me.");
         return 0;
     }
 
     /* Replace the reply key with the FAST armor key.  */
     reply_key = cb->fast_armor(context, rock);
     if (reply_key == NULL) {
-        SERVER_DEBUG("No armor key found when returning padata.");
-        return KRB5_PREAUTH_FAILED;
+        return EINVAL;
+        SERVER_DEBUG(retval, "No armor key found when returning padata.");
     }
     krb5_free_keyblock_contents(context, encrypting_key);
     retval = krb5_copy_keyblock_contents(context, reply_key, encrypting_key);
     if (retval != 0) {
-        SERVER_DEBUG("Unable to copy reply key.");
+        SERVER_DEBUG(retval, "Unable to copy reply key.");
         return retval;
     }
 

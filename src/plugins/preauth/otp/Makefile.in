@@ -19,7 +19,7 @@ SHLIB_EXPDEPS = \
 	$(TOPLIBD)/libk5crypto$(SHLIBEXT) \
 	$(TOPLIBD)/libkadm5srv_mit$(SHLIBEXT) \
 	$(TOPLIBD)/libkrb5$(SHLIBEXT)
-SHLIB_EXPLIBS= -lkrb5 -lkadm5srv_mit -lcom_err -lk5crypto @otp_libs@ $(SUPPORT_LIB) $(LIBS)
+SHLIB_EXPLIBS= -lkrb5 -lcom_err -lk5crypto @otp_libs@ $(SUPPORT_LIB) $(LIBS)
 
 SHLIB_DIRS=-L$(TOPLIBD)
 SHLIB_RDIRS=$(KRB5_LIBDIR)

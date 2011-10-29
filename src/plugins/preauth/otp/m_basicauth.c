@@ -89,59 +89,60 @@ verify_otp(const struct otp_req_ctx *req_ctx, const char *pw)
 #endif
 
     if (pw == NULL) {
-        SERVER_DEBUG("[basicauth] OTP is missing.");
+        SERVER_DEBUG(EINVAL, "[basicauth] OTP is missing.");
         return EINVAL;
     }
 
     /* Blob contains username.  */
     if (req_ctx->blob == NULL) {
-        SERVER_DEBUG("[basicauth] Binary blob is missing.");
+        SERVER_DEBUG(EINVAL, "[basicauth] Blob is missing.");
         return EINVAL;
     }
     username = req_ctx->blob;
 
     if (ctx->url == NULL) {
-        SERVER_DEBUG("[basicauth] Missing otp_url_template in krb5.conf.");
+        SERVER_DEBUG(EINVAL,
+                     "[basicauth] Missing otp_url_template in krb5.conf.");
         return EINVAL;
     }
 
     /* Set curl options.  */
     cret = curl_easy_setopt(ctx->curlh, CURLOPT_URL, ctx->url);
     if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        SERVER_DEBUG(cret, "%s:%d: curl error.", __func__, __LINE__);
         return 200 + cret;
     }
     cret = curl_easy_setopt(ctx->curlh, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
     if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        SERVER_DEBUG(cret, "%s:%d: curl error.", __func__, __LINE__);
         return 200 + cret;
     }
     cret = curl_easy_setopt(ctx->curlh, CURLOPT_USERNAME, username);
     if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        SERVER_DEBUG(cret, "%s:%d: curl error.", __func__, __LINE__);
         return 200 + cret;
     }
     cret = curl_easy_setopt(ctx->curlh, CURLOPT_PASSWORD, pw);
     if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        SERVER_DEBUG(cret, "%s:%d: curl error.", __func__, __LINE__);
         return 200 + cret;
     }
     cret = curl_easy_setopt(ctx->curlh, CURLOPT_TIMEOUT_MS, 3000);
     if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        SERVER_DEBUG(cret, "%s:%d: curl error.", __func__, __LINE__);
         return 200 + cret;
     }
     cret = curl_easy_setopt(ctx->curlh, CURLOPT_SSLVERSION,
                             CURL_SSLVERSION_TLSv1);
     if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        SERVER_DEBUG(cret, "%s:%d: curl error.", __func__, __LINE__);
         return 200 + cret;
     }
 
 #if !defined DEBUG
     cret = curl_easy_setopt(ctx->curlh, CURLOPT_WRITEFUNCTION, curl_wfunc);
     if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        SERVER_DEBUG(cret, "%s:%d: curl error.", __func__, __LINE__);
         return 200 + cret;
     }
 #endif  /* !DEBUG */
@@ -155,21 +156,21 @@ verify_otp(const struct otp_req_ctx *req_ctx, const char *pw)
     curl_easy_setopt(ctx->curlh, CURLOPT_ERRORBUFFER, NULL);
 #endif
     if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d (%s)", __func__, __LINE__, cret,
+        SERVER_DEBUG(cret, "%s:%d: curl error (%s).", __func__, __LINE__,
                      curl_errbuf);
         return 200 + cret;
     }
 
     cret = curl_easy_getinfo(ctx->curlh, CURLINFO_RESPONSE_CODE, &respcode);
     if (cret != CURLE_OK) {
-        SERVER_DEBUG("%s:%d: curl error %d", __func__, __LINE__, cret);
+        SERVER_DEBUG(cret, "%s:%d: curl error.", __func__, __LINE__);
         return 200 + cret;
     }
     if (respcode == 200) {
         return 0;
     }
 
-    SERVER_DEBUG("[basicauth] OTP authn response: %ld", respcode);
+    SERVER_DEBUG(0, "[basicauth] OTP authn response: %ld", respcode);
     return EACCES;
 }
 
@@ -207,16 +208,16 @@ otp_basicauth_server_init(struct otp_server_ctx *otp_ctx,
 
     cret = curl_global_init(CURL_GLOBAL_SSL);
     if (cret != 0) {
-        SERVER_DEBUG("[basicauth] curl global init failed.");
         retval = EFAULT;
+        SERVER_DEBUG(retval, "[basicauth] curl global init failed.");
         goto errout;
     }
     curl_global_init_done_flag = 1;
 
     ctx->curlh = curl_easy_init();
     if (ctx->curlh == NULL) {
-        SERVER_DEBUG("[basicauth] curl init failed.");
         retval = EFAULT;
+        SERVER_DEBUG(retval, "[basicauth] curl init failed.");
         goto errout;
     }
 
